@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}영상면접{% endblock %}
+{% block content %}
+<div style="max-width: 640px; margin: 40px auto 0;">
+  <div id="startGate" class="card"{% if has_first_response %} style="display: none;"{% endif %}>
+    <h1 style="font-size: 24px;">영상면접</h1>
+    <p>{{ candidate_name }}님, 카메라와 마이크 권한을 허용한 뒤 질문에 답변해주세요.</p>
+    <button id="startBtn" class="btn btn-primary">카메라 준비</button>
+  </div>
+
+  <div id="followUpPanel" class="card"{% if not existing or not existing.follow_up_question or existing.follow_up_submitted_at %} style="display: none;"{% endif %}>
+    <h2>추가 질문</h2>
+    <p id="followUpPrompt">{% if existing %}{{ existing.follow_up_question }}{% endif %}</p>
+    <form id="followUpForm">
+      <label for="followUpTranscript"><strong>답변 텍스트</strong></label>
+      <textarea id="followUpTranscript" name="transcript" required rows="5" style="width: 100%; margin: 8px 0 16px;"></textarea>
+      <label for="followUpVideo"><strong>답변 영상</strong></label>
+      <input id="followUpVideo" name="video" type="file" accept="video/*" capture required style="display: block; margin: 8px 0 16px;">
+      <button class="btn btn-primary" type="submit">추가 답변 제출</button>
+    </form>
+  </div>
+
+  <div id="interviewPanel" class="card" style="display: none;">
+    <p class="meta">질문</p>
+    <h2>{{ question }}</h2>
+    <video id="preview" autoplay muted playsinline style="width: 100%; border-radius: 0; background: var(--color-onyx);"></video>
+    <div style="margin-top: 16px; display: flex; gap: 12px;">
+      <button id="recordBtn" class="btn btn-primary">녹화 시작</button>
+      <button id="stopBtn" class="btn btn-ghost" disabled>녹화 종료 및 제출</button>
+    </div>
+    <p style="margin-top: 16px;">
+      <span class="meta">실시간 인식된 답변</span><br>
+      <span id="transcriptPreview" style="font-family: var(--font-mono); font-size: 13px;"></span>
+    </p>
+  </div>
+
+  <div id="resultPanel" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+    <h2>제출 완료</h2>
+    <p>답변이 저장되었습니다.</p>
+    <p><strong>AI가 생성한 추가 질문</strong></p>
+    <p id="followUpQuestion">{% if already_done %}{{ existing_follow_up|default:"(생성되지 않음)" }}{% endif %}</p>
+    <p><a href="{% url 'invites:start' %}">시작 화면으로</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const submitUrl = '{% url "interviews:submit_response" %}';
+let followUpSubmitUrl = {% if existing %}'{% url "interviews:submit_follow_up" existing.pk %}'{% else %}''{% endif %};
+let mediaRecorder;
+let recordedChunks = [];
+let transcript = '';
+let recognition = null;
+
+const alreadyDone = {{ already_done|yesno:"true,false" }};
+
+if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', async function () {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  } catch (err) {
+    alert('카메라 또는 마이크 권한을 허용해야 면접을 진행할 수 있습니다.');
+    return;
+  }
+  const preview = document.getElementById('preview');
+  preview.srcObject = stream;
+
+  document.getElementById('startGate').style.display = 'none';
+  document.getElementById('interviewPanel').style.display = 'block';
+
+  const recorderOptions = (window.MediaRecorder && MediaRecorder.isTypeSupported('video/webm'))
+    ? { mimeType: 'video/webm' }
+    : {};
+  try {
+    mediaRecorder = new MediaRecorder(stream, recorderOptions);
+  } catch (err) {
+    alert('이 브라우저에서는 영상 녹화를 지원하지 않습니다.');
+    return;
+  }
+  mediaRecorder.ondataavailable = function (e) {
+    if (e.data.size > 0) recordedChunks.push(e.data);
+  };
+
+  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognitionCtor) {
+    recognition = new SpeechRecognitionCtor();
+    recognition.lang = 'ko-KR';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = function (event) {
+      let finalText = '';
+      for (let i = 0; i < event.results.length; i++) {
+        finalText += event.results[i][0].transcript;
+      }
+      transcript = finalText;
+      document.getElementById('transcriptPreview').textContent = transcript;
+    };
+  }
+});
+
+if (!alreadyDone) document.getElementById('recordBtn').addEventListener('click', function () {
+  recordedChunks = [];
+  mediaRecorder.start();
+  if (recognition) recognition.start();
+  document.getElementById('recordBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+});
+
+if (!alreadyDone) document.getElementById('stopBtn').addEventListener('click', function () {
+  document.getElementById('stopBtn').disabled = true;
+
+  mediaRecorder.addEventListener('stop', function onStop() {
+    mediaRecorder.removeEventListener('stop', onStop);
+    if (recognition) recognition.stop();
+
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const formData = new FormData();
+    formData.append('transcript', transcript);
+    formData.append('video', blob, 'interview.webm');
+
+    fetch(submitUrl, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+      body: formData,
+    })
+      .then(function (r) {
+        if (!r.ok && r.status !== 409) throw new Error('save failed');
+        return r.json();
+      })
+      .then(function (data) {
+        document.getElementById('interviewPanel').style.display = 'none';
+        if (data.follow_up_question) {
+          followUpSubmitUrl = '/interview/' + data.response_id + '/follow-up/submit/';
+          document.getElementById('followUpPrompt').textContent = data.follow_up_question;
+          document.getElementById('followUpPanel').style.display = 'block';
+        } else {
+          document.getElementById('resultPanel').style.display = 'block';
+          document.getElementById('followUpQuestion').textContent = '(생성되지 않음)';
+        }
+      })
+      .catch(function () {
+        document.getElementById('stopBtn').disabled = false;
+        alert('저장에 실패했습니다. 다시 시도해주세요.');
+      });
+  });
+
+  mediaRecorder.stop();
+});
+
+document.getElementById('followUpForm').addEventListener('submit', function (event) {
+  event.preventDefault();
+  const formData = new FormData(event.target);
+  fetch(followUpSubmitUrl, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrfToken },
+    body: formData,
+  }).then(function (response) {
+    if (!response.ok && response.status !== 409) throw new Error('save failed');
+    document.getElementById('followUpPanel').style.display = 'none';
+    document.getElementById('resultPanel').style.display = 'block';
+    document.getElementById('followUpQuestion').textContent = document.getElementById('followUpPrompt').textContent;
+  }).catch(function () {
+    alert('저장에 실패했습니다. 다시 시도해 주세요.');
+  });
+});
+</script>
+{% endblock %}

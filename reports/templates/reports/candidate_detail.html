@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ email }} 리포트{% endblock %}
+{% block content %}
+<div style="margin-top: 40px;">
+  <p><a href="{% url 'reports:candidate_list' %}">&larr; 목록으로</a></p>
+  <h1>{% if candidate %}{{ candidate.name }}{% else %}{{ email }}{% endif %}</h1>
+  <p class="meta">{% if candidate %}{{ email }} · {% endif %}종합 리포트</p>
+
+  <div class="card">
+    <strong>완료 현황</strong>
+    <p>설문 {% if survey_complete %}완료{% else %}미완료{% endif %} · 게임 {% if game_complete %}완료{% else %}미완료{% endif %} · 면접 {% if interview_complete %}완료{% else %}미완료{% endif %}</p>
+  </div>
+
+  <section class="module">
+    <h2>성향파악</h2>
+    {% for r in survey_responses %}
+      <div class="card">
+        <p class="meta">{{ r.survey.title }} · {{ r.created_at }}</p>
+        <p><strong>종합 환산점수:</strong> {{ r.score|default:"-" }} / 100 · {{ r.interpretation }}</p>
+        {% if r.score is not None %}
+          <dl class="report-dl">
+            {% for domain in r.domain_scores %}
+              <dt>{{ domain.label }}</dt><dd>{{ domain.score }}점 ({{ domain.answered }}문항 응답)</dd>
+            {% endfor %}
+          </dl>
+        {% endif %}
+        {% if r.score is None %}
+          <dl class="report-dl">
+            {% for key, value in r.answers.items %}
+              <dt>{{ key }}</dt><dd>{{ value }}</dd>
+            {% endfor %}
+          </dl>
+        {% endif %}
+      </div>
+    {% empty %}
+      <p class="meta">제출된 설문이 없습니다.</p>
+    {% endfor %}
+  </section>
+
+  <section class="module">
+    <h2>전략게임</h2>
+    {% for g in game_results %}
+      <div class="card">
+        <p class="meta"><span class="badge">{{ g.game_slug }}</span> · {{ g.created_at }}</p>
+        <dl class="report-dl">
+          <dt>정확도</dt><dd>{{ g.summary.accuracy }}</dd>
+          <dt>평균 반응시간(ms)</dt><dd>{{ g.summary.avg_rt_ms }}</dd>
+          <dt>시행 수</dt><dd>{{ g.summary.n_trials }}</dd>
+        </dl>
+        <p><strong>해석:</strong> {{ g.interpretation }}</p>
+      </div>
+    {% empty %}
+      <p class="meta">완료된 게임이 없습니다.</p>
+    {% endfor %}
+  </section>
+
+  <section class="module">
+    <h2>영상면접</h2>
+    {% for i in interview_responses %}
+      <div class="card">
+        <p class="meta">{{ i.created_at }}</p>
+        <p><strong>질문</strong><br>{{ i.question }}</p>
+        <p><strong>답변(음성인식)</strong><br>{{ i.transcript|default:"(인식된 텍스트 없음)" }}</p>
+        <p><strong>AI 후속 질문</strong><br>{{ i.follow_up_question|default:"(생성되지 않음)" }}</p>
+        {% if i.follow_up_question %}<p><strong>후속 답변</strong><br>{{ i.follow_up_transcript|default:"(미제출)" }}</p>{% endif %}
+        {% if i.video %}<video src="{% url 'interviews:serve_video' i.pk %}" controls style="width: 100%; max-width: 480px; border-radius: 0;"></video>{% endif %}
+        {% if i.follow_up_video %}<video src="{% url 'interviews:serve_follow_up_video' i.pk %}" controls style="width: 100%; max-width: 480px; border-radius: 0;"></video>{% endif %}
+      </div>
+    {% empty %}
+      <p class="meta">완료된 영상면접이 없습니다.</p>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

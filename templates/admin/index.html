@@ -1,0 +1,74 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">{% endblock %}
+
+{% block coltype %}colMS{% endblock %}
+
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+
+{% block nav-breadcrumbs %}{% endblock %}
+{% block content_title %}{% endblock %}
+{% block content %}
+<div id="content-main">
+  <div class="dashboard-heading">
+    <p class="eyebrow">AI COMPETENCY ASSESSMENT</p>
+    <h1>관리 대시보드</h1>
+    <p>응시자, 초대 링크와 검사 결과를 관리합니다.</p>
+  </div>
+
+  <div class="dashboard-stats">
+    {% for app in app_list %}
+      {% for model in app.models %}
+        {% if model.object_name == 'Candidate' or model.object_name == 'Invite' or model.object_name == 'SurveyResponse' or model.object_name == 'GameResult' or model.object_name == 'InterviewResponse' %}
+          <a class="dashboard-stat" href="{{ model.admin_url }}">
+            <span>{{ model.name }}</span>
+            <strong>{{ model.count }}</strong>
+          </a>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  </div>
+
+  <div class="dashboard-actions module">
+    <h2>빠른 작업</h2>
+    <div class="dashboard-action-links">
+      <a class="button" href="{% url 'admin:invites_candidate_changelist' %}">지원자 및 초대 관리</a>
+      <a class="button" href="{% url 'reports:candidate_list' %}">종합 리포트 보기</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block sidebar %}
+<div id="content-related">
+    <div class="module" id="recent-actions-module">
+        <h2>최근 작업</h2>
+        <h3>내 작업 기록</h3>
+            {% load log %}
+            {% get_admin_log 10 as admin_log for_user user %}
+            {% if not admin_log %}
+            <p>최근 작업이 없습니다.</p>
+            {% else %}
+            <ul class="actionlist">
+            {% for entry in admin_log %}
+            <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
+                <span class="visually-hidden">{% if entry.is_addition %}{% translate 'Added:' %}{% elif entry.is_change %}{% translate 'Changed:' %}{% elif entry.is_deletion %}{% translate 'Deleted:' %}{% endif %}</span>
+                {% if entry.is_deletion or not entry.get_admin_url %}
+                    {{ entry.object_repr }}
+                {% else %}
+                    <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+                {% endif %}
+                <br>
+                {% if entry.content_type %}
+                    <span class="mini quiet">{% filter capfirst %}{{ entry.content_type.name }}{% endfilter %}</span>
+                {% else %}
+                    <span class="mini quiet">{% translate 'Unknown content' %}</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+            </ul>
+            {% endif %}
+    </div>
+</div>
+{% endblock %}

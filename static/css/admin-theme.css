@@ -1,0 +1,405 @@
+/* Lightdash theming for Django admin, via its documented CSS custom properties. */
+:root, html[data-theme="light"] {
+    --primary: #ffed00;
+    --secondary: #000000;
+    --accent: #ffed00;
+    --primary-fg: #000000;
+
+    --body-fg: #222222;
+    --body-bg: #ffffff;
+    --body-quiet-color: #666666;
+    --body-medium-color: #333333;
+    --body-loud-color: #000000;
+
+    --header-color: #000000;
+    --header-branding-color: #000000;
+    --header-bg: #ffffff;
+    --header-link-color: #000000;
+
+    --breadcrumbs-fg: rgba(255,255,255,.72);
+    --breadcrumbs-link-fg: #ffffff;
+    --breadcrumbs-bg: #000000;
+
+    --link-fg: #000000;
+    --link-hover-color: #000000;
+    --link-selected-fg: #000000;
+
+    --hairline-color: #f2f2f2;
+    --border-color: #c4c4c4;
+
+    --message-success-bg: #eafbea;
+    --message-warning-bg: #fff8e1;
+    --message-error-bg: #ffefef;
+
+    --darkened-bg: #f7f7f7;
+    --selected-bg: #f2f2f2;
+    --selected-row: #fffbd1;
+
+    --button-fg: #000000;
+    --button-bg: #ffed00;
+    --button-hover-bg: #e6d200;
+    --default-button-bg: #000000;
+    --default-button-hover-bg: #111111;
+    --close-button-bg: #818898;
+    --close-button-hover-bg: #666d80;
+
+    --object-tools-bg: #000000;
+    --object-tools-hover-bg: #111111;
+
+    --font-family-primary: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
+    --lightdash-radius: 0;
+    --lightdash-shadow: none;
+}
+
+body {
+    font-family: var(--font-family-primary);
+    background: #f6f8fa;
+}
+
+#header, .module h2, .module caption, fieldset.module h2 {
+    font-family: var(--font-family-primary);
+}
+
+.button, input[type="submit"], input[type="button"], .submit-row input, a.button {
+    border-radius: 2px;
+}
+
+#branding h1#site-name a {
+    font-family: var(--font-family-primary);
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+div.breadcrumbs {
+    font-family: var(--font-family-primary);
+}
+
+/* Always show the left nav-sidebar as a fixed panel instead of Django's
+   default collapsed-by-default/toggle behaviour, so every admin page reads
+   as menu-left / content-right. */
+#nav-sidebar, .main > #nav-sidebar {
+    visibility: visible !important;
+    margin-left: 0 !important;
+    background-color: #ffffff;
+    border-right: 1px solid var(--border-color);
+}
+
+.main > #nav-sidebar + .content,
+.main.shifted > #nav-sidebar + .content {
+    max-width: calc(100% - 299px) !important;
+}
+
+#toggle-nav-sidebar {
+    display: none;
+}
+
+#nav-sidebar .module th, #nav-sidebar .module caption {
+    color: var(--body-quiet-color);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+}
+
+#nav-sidebar .current-model {
+    border-radius: 0;
+    background: #ffed00;
+}
+
+#nav-sidebar .local-test-menu {
+    margin-top: 12px;
+    border: 0;
+    border-top: 1px solid var(--border-color);
+    border-radius: 0;
+}
+
+#nav-sidebar .local-test-menu caption {
+    background: #000000;
+    color: #ffffff;
+}
+
+#nav-sidebar .local-test-menu th {
+    padding: 10px 16px;
+}
+
+#nav-sidebar a {
+    color: var(--body-fg);
+}
+
+#nav-sidebar .current-model a,
+#nav-sidebar a:hover {
+    color: var(--primary);
+}
+
+#content {
+    padding: 32px;
+}
+
+#content h1 {
+    font-family: var(--font-family-primary);
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.dashboard #content {
+    width: auto;
+}
+
+.dashboard-heading {
+    margin-bottom: 24px;
+}
+
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.dashboard-stat {
+    display: flex;
+    min-height: 112px;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--lightdash-radius);
+    background: #ffffff;
+    color: var(--body-fg);
+    text-decoration: none;
+}
+
+.dashboard-stat:hover {
+    border-color: var(--primary);
+    box-shadow: none;
+    background: #fffbd1;
+}
+
+.dashboard-stat span {
+    color: var(--body-quiet-color);
+    font-size: 13px;
+}
+
+.dashboard-stat strong {
+    color: #000000;
+    font-family: var(--font-family-primary);
+    font-size: 30px;
+}
+
+.dashboard-actions {
+    margin-bottom: 24px;
+}
+
+.dashboard-action-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 16px;
+}
+
+.dashboard-heading h1,
+.admin-login-card h1 {
+    margin: 4px 0 8px;
+    font-size: 30px;
+}
+
+.dashboard-heading p,
+.login-help {
+    color: var(--body-quiet-color);
+    margin: 0;
+}
+
+.eyebrow {
+    color: var(--primary) !important;
+    font-family: var(--font-family-primary);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+}
+
+.module,
+#changelist-filter,
+#content-related .module,
+.inline-group {
+    border: 1px solid var(--border-color);
+    border-radius: var(--lightdash-radius);
+    background: #ffffff;
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.module h2,
+.module caption,
+.inline-group h2,
+#changelist-filter h2 {
+    padding: 12px 16px;
+    background: #000000;
+    color: #ffffff;
+    font-size: 14px;
+    letter-spacing: -.01em;
+}
+
+.dashboard .module table th,
+.dashboard .module table td {
+    padding: 12px 16px;
+}
+
+.dashboard .module + .module {
+    margin-top: 16px;
+}
+
+#content-related .module h2 {
+    margin: 0;
+}
+
+#recent-actions-module h3,
+#recent-actions-module p,
+#recent-actions-module .actionlist {
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+#changelist .results {
+    border: 1px solid var(--border-color);
+    border-radius: var(--lightdash-radius);
+    background: #ffffff;
+    overflow: auto;
+}
+
+#changelist table thead th {
+    background: #f2f2f2;
+    color: #222222;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+#changelist table tbody td,
+#changelist table tbody th {
+    padding: 10px 12px;
+    border-color: #eceff3;
+}
+
+#changelist table tbody tr:hover {
+    background: #f7f7f7;
+}
+
+#changelist-search input[type="text"],
+.vTextField,
+.vURLField,
+.vEmailField,
+.vIntegerField,
+input[type="password"],
+textarea,
+select {
+    border: 1px solid var(--border-color);
+    border-radius: 0;
+    padding: 9px 11px;
+    font-family: var(--font-family-primary);
+}
+
+#changelist-search input[type="text"]:focus,
+.vTextField:focus,
+.vURLField:focus,
+.vEmailField:focus,
+.vIntegerField:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+    border-color: #000000;
+    outline: 0;
+    box-shadow: 0 2px 0 #ffed00;
+}
+
+.aligned .form-row {
+    padding: 16px;
+    border-bottom-color: #eceff3;
+}
+
+.submit-row {
+    border: 1px solid var(--border-color);
+    border-radius: var(--lightdash-radius);
+    background: #ffffff;
+}
+
+.object-tools a,
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+a.button {
+    min-height: 36px;
+    padding: 9px 16px;
+    font-weight: 500;
+}
+
+.login #header {
+    background: #ffffff;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.login #branding h1#site-name a {
+    color: #000000;
+}
+
+.login #container {
+    width: 100%;
+    max-width: none;
+    min-height: 100vh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: #f6f8fa;
+}
+
+.login #content {
+    max-width: 400px;
+    margin: 64px auto;
+    padding: 0 24px;
+}
+
+.admin-login-card {
+    padding: 28px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--lightdash-radius);
+    background: #ffffff;
+    box-shadow: var(--lightdash-shadow);
+}
+
+.admin-login-card .form-row {
+    padding: 16px 0 0;
+}
+
+.admin-login-card .form-row label {
+    display: block;
+    padding: 0 0 6px;
+    color: var(--body-quiet-color);
+}
+
+.admin-login-card input[type="text"],
+.admin-login-card input[type="password"] {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.admin-login-card .submit-row {
+    padding: 20px 0 0;
+    border: 0;
+}
+
+.admin-login-card .submit-row input {
+    width: 100%;
+}
+
+@media (max-width: 767px) {
+    #nav-sidebar {
+        display: none;
+    }
+
+    .main > #nav-sidebar + .content,
+    .main.shifted > #nav-sidebar + .content {
+        max-width: 100% !important;
+    }
+
+    #content {
+        padding: 20px;
+    }
+}

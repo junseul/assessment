@@ -1,0 +1,18 @@
+{% load i18n %}
+<button class="sticky toggle-nav-sidebar" id="toggle-nav-sidebar" aria-label="{% translate 'Toggle navigation' %}"></button>
+<nav class="sticky" id="nav-sidebar" aria-label="{% translate 'Sidebar' %}">
+  <input type="search" id="nav-filter"
+         placeholder="{% translate 'Start typing to filter…' %}"
+         aria-label="{% translate 'Filter navigation items' %}">
+  {% include 'admin/app_list.html' with app_list=available_apps show_changelinks=False %}
+  {% if user.is_staff %}
+    <div class="module local-test-menu">
+      <table>
+        <caption><span class="section">로컬 테스트</span></caption>
+        <tr><th scope="row"><a href="{% url 'invites:local_test' 'traits' %}">성향파악</a></th></tr>
+        <tr><th scope="row"><a href="{% url 'invites:local_test' 'games' %}">전략게임</a></th></tr>
+        <tr><th scope="row"><a href="{% url 'invites:local_test' 'interviews' %}">면접응답</a></th></tr>
+      </table>
+    </div>
+  {% endif %}
+</nav>

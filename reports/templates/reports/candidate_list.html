@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}지원자 목록{% endblock %}
+{% block content %}
+<div style="margin-top: 40px;">
+  <h1>지원자 목록</h1>
+  <p>{{ candidates|length }}명의 지원자가 하나 이상의 모듈을 완료했습니다.</p>
+
+  <div class="card" style="padding: 8px 16px;">
+    <ul class="candidate-list">
+      {% for c in candidates %}
+        <li>
+          <a href="{% url 'reports:candidate_detail' c.pk %}">
+            {% if c.name %}{{ c.name }} · {% endif %}{{ c.email }}
+          </a>
+        </li>
+      {% empty %}
+        <li style="padding: 16px 4px; color: var(--color-fog-text);">아직 응시한 지원자가 없습니다.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block bodyclass %}{{ block.super }} login{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+
+{% block content %}
+<div class="admin-login-card">
+  <p class="eyebrow">AI COMPETENCY ASSESSMENT</p>
+  <h1>관리자 로그인</h1>
+  <p class="login-help">응시자와 검사 결과를 관리하려면 로그인하세요.</p>
+  {% if form.errors %}<p class="errornote">아이디 또는 비밀번호를 확인하세요.</p>{% endif %}
+  <form action="{{ app_path }}" method="post" id="login-form">
+    {% csrf_token %}
+    <div class="form-row">
+      {{ form.username.errors }}
+      {{ form.username.label_tag }}
+      {{ form.username }}
+    </div>
+    <div class="form-row">
+      {{ form.password.errors }}
+      {{ form.password.label_tag }}
+      {{ form.password }}
+      <input type="hidden" name="next" value="{{ next }}">
+    </div>
+    <div class="submit-row"><input type="submit" value="로그인"></div>
+  </form>
+</div>
+{% endblock %}

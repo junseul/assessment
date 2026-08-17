@@ -1,7 +1,9 @@
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 
 from games.models import GameResult
@@ -30,12 +32,25 @@ def local_test(request, stage):
         survey = Survey.objects.order_by('id').first()
         if survey is None:
             raise Http404('테스트할 설문이 없습니다.')
-        return redirect('traits:survey_detail', pk=survey.pk)
-    if stage == 'games':
-        return redirect('games:go_nogo')
-    if stage == 'interviews':
-        return redirect('interviews:interview_detail')
-    raise Http404
+        iframe_src = reverse('traits:survey_detail', args=[survey.pk])
+        title = '성향파악 테스트'
+    elif stage == 'games':
+        iframe_src = reverse('games:admin_grid')
+        title = '전략게임 테스트'
+    elif stage == 'interviews':
+        iframe_src = reverse('interviews:interview_detail')
+        title = '면접응답 테스트'
+    else:
+        raise Http404
+
+    # Renders inside the admin shell (left nav-sidebar intact) with the actual
+    # candidate-facing flow loaded in an iframe, instead of navigating away
+    # from /admin/ entirely.
+    return render(request, 'invites/admin_local_test.html', {
+        **admin.site.each_context(request),
+        'title': title,
+        'iframe_src': iframe_src,
+    })
 
 
 def verify(request, token):
@@ -80,7 +95,7 @@ def start(request):
         survey_done = SurveyResponse.objects.filter(survey=survey, candidate=request.candidate).exists()
     else:
         survey_done = SurveyResponse.objects.filter(candidate=request.candidate).exists()
-    game_done = GameResult.objects.filter(candidate=request.candidate).exists()
+    game_done = GameResult.objects.filter(candidate=request.candidate, game_slug='radar-control').exists()
     interview = InterviewResponse.objects.filter(candidate=request.candidate).order_by('-created_at').first()
     interview_done = bool(interview) and (
         not interview.follow_up_question or bool(interview.follow_up_submitted_at)
@@ -88,7 +103,7 @@ def start(request):
     if survey and not survey_done:
         return redirect('traits:survey_detail', pk=survey.pk)
     if not game_done:
-        return redirect('games:go_nogo')
+        return redirect('games:index')
     if not interview_done:
         return redirect('interviews:interview_detail')
     return render(request, 'invites/start.html', {

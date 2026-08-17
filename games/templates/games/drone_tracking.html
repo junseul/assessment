@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}전략게임: 드론 추적{% endblock %}
+{% block extra_head %}
+<style>
+  #motArena {
+    position: relative; width: 100%; max-width: 600px; height: 360px;
+    margin: 0 auto; background: var(--color-cloud-mist); border-radius: var(--radius-cards);
+    overflow: hidden; user-select: none;
+  }
+  .drone { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #7b8794; }
+  .drone.target-highlight { background: #e5484d; }
+  .drone.selectable { cursor: pointer; }
+  .drone.selected { outline: 3px solid #22a06b; outline-offset: 2px; }
+  #motStatus { text-align: center; margin-top: 16px; font-size: 14px; color: var(--color-steel-text); }
+  #motConfirm { display: block; margin: 16px auto 0; }
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width: 640px; margin: 40px auto 0;">
+  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
+    <h1 style="font-size: 24px;">전략게임 · 드론 추적 (5/9)</h1>
+    <p>{{ candidate_name }}님, 빨간색으로 잠깐 표시되는 드론들을 기억하세요. 이후 모든 드론이 같은 색으로 섞여 움직입니다. 정지하면 처음 표시됐던 드론들을 클릭해 선택하고 확인을 누르세요.</p>
+    <button id="startBtn" class="btn btn-primary">게임 시작</button>
+  </div>
+  <div id="jspsych-target" style="display: none;">
+    <div id="motArena"></div>
+    <div id="motStatus"></div>
+    <button id="motConfirm" class="btn btn-primary" style="display: none;" disabled>확인</button>
+  </div>
+  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+    <h2>완료</h2>
+    <p>결과가 저장되었습니다. 감사합니다.</p>
+    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const submitUrl = '{% url "games:submit_result" slug %}';
+const alreadyDone = {{ already_done|yesno:"true,false" }};
+
+if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', runGame);
+
+function runGame() {
+  document.getElementById('startGate').style.display = 'none';
+  document.getElementById('jspsych-target').style.display = 'block';
+
+  const arena = document.getElementById('motArena');
+  const statusEl = document.getElementById('motStatus');
+  const confirmBtn = document.getElementById('motConfirm');
+
+  const N_TRIALS = 20;
+  const N_OBJECTS = 10;
+  const HIGHLIGHT_MS = 2000;
+  const MOVE_MS = 6000;
+  const RADIUS = 13;
+  const SPEED = 90; // px/sec
+  const MIN_TARGETS = 2;
+  const MAX_TARGETS = 5;
+
+  let nTargets = MIN_TARGETS;
+  let consecutiveFullyCorrect = 0;
+  const trials = [];
+
+  function mean(values) {
+    return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
+  }
+
+  function placeObjects() {
+    const w = arena.clientWidth, h = arena.clientHeight;
+    const objects = [];
+    for (let i = 0; i < N_OBJECTS; i++) {
+      let x, y, tries = 0, ok = false;
+      do {
+        x = RADIUS + Math.random() * (w - 2 * RADIUS);
+        y = RADIUS + Math.random() * (h - 2 * RADIUS);
+        ok = objects.every(function (o) { return Math.hypot(o.x - x, o.y - y) > RADIUS * 3; });
+        tries++;
+      } while (!ok && tries < 200);
+      const angle = Math.random() * Math.PI * 2;
+      objects.push({ x: x, y: y, vx: Math.cos(angle) * SPEED, vy: Math.sin(angle) * SPEED, el: null });
+    }
+    return objects;
+  }
+
+  function render(objects) {
+    arena.innerHTML = '';
+    objects.forEach(function (o, idx) {
+      const el = document.createElement('div');
+      el.className = 'drone';
+      el.style.left = (o.x - RADIUS) + 'px';
+      el.style.top = (o.y - RADIUS) + 'px';
+      el.dataset.idx = idx;
+      arena.appendChild(el);
+      o.el = el;
+    });
+  }
+
+  function runTrial(onDone) {
+    const objects = placeObjects();
+    render(objects);
+
+    const targetIdx = shuffleIndices(objects.length).slice(0, nTargets);
+    targetIdx.forEach(function (idx) { objects[idx].el.classList.add('target-highlight'); });
+    statusEl.textContent = '빨간 드론 ' + nTargets + '개를 기억하세요';
+
+    setTimeout(function () {
+      objects.forEach(function (o) { o.el.classList.remove('target-highlight'); });
+      statusEl.textContent = '움직이는 중...';
+
+      const w = arena.clientWidth, h = arena.clientHeight;
+      let last = performance.now();
+      let raf;
+      function step(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        objects.forEach(function (o) {
+          o.x += o.vx * dt;
+          o.y += o.vy * dt;
+          if (o.x < RADIUS || o.x > w - RADIUS) { o.vx *= -1; o.x = Math.max(RADIUS, Math.min(w - RADIUS, o.x)); }
+          if (o.y < RADIUS || o.y > h - RADIUS) { o.vy *= -1; o.y = Math.max(RADIUS, Math.min(h - RADIUS, o.y)); }
+          o.el.style.left = (o.x - RADIUS) + 'px';
+          o.el.style.top = (o.y - RADIUS) + 'px';
+        });
+        raf = requestAnimationFrame(step);
+      }
+      raf = requestAnimationFrame(step);
+
+      setTimeout(function () {
+        cancelAnimationFrame(raf);
+        statusEl.textContent = '기억했던 드론 ' + nTargets + '개를 클릭하세요';
+
+        const selected = new Set();
+        objects.forEach(function (o, idx) {
+          o.el.classList.add('selectable');
+          o.el.addEventListener('click', function () {
+            if (selected.has(idx)) {
+              selected.delete(idx);
+              o.el.classList.remove('selected');
+            } else if (selected.size < nTargets) {
+              selected.add(idx);
+              o.el.classList.add('selected');
+            }
+            confirmBtn.disabled = selected.size !== nTargets;
+          });
+        });
+
+        confirmBtn.style.display = 'inline-block';
+        confirmBtn.disabled = true;
+        confirmBtn.onclick = function () {
+          confirmBtn.style.display = 'none';
+          objects.forEach(function (o) { o.el.classList.remove('selectable'); });
+          const correctSelected = Array.from(selected).filter(function (idx) { return targetIdx.includes(idx); }).length;
+          const trial = {
+            trial_stage: 'mot',
+            n_targets: nTargets,
+            n_objects: N_OBJECTS,
+            correct_selected: correctSelected,
+            wrong_selected: selected.size - correctSelected,
+            tracking_accuracy: correctSelected / nTargets,
+            fully_correct: correctSelected === nTargets && selected.size === nTargets,
+          };
+          trials.push(trial);
+
+          if (trial.fully_correct) {
+            consecutiveFullyCorrect++;
+            if (consecutiveFullyCorrect >= 2) { nTargets = Math.min(MAX_TARGETS, nTargets + 1); consecutiveFullyCorrect = 0; }
+          } else {
+            consecutiveFullyCorrect = 0;
+            if (trial.tracking_accuracy < 0.5) nTargets = Math.max(MIN_TARGETS, nTargets - 1);
+          }
+          onDone();
+        };
+      }, MOVE_MS);
+    }, HIGHLIGHT_MS);
+  }
+
+  function shuffleIndices(n) {
+    const arr = Array.from({ length: n }, function (_, i) { return i; });
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  let trialNum = 0;
+  function nextTrial() {
+    if (trialNum >= N_TRIALS) return finish();
+    trialNum++;
+    statusEl.textContent = '';
+    setTimeout(function () { runTrial(nextTrial); }, 500);
+  }
+
+  function finish() {
+    const accByCount = {};
+    trials.forEach(function (t) {
+      const key = String(t.n_targets);
+      (accByCount[key] = accByCount[key] || []).push(t.tracking_accuracy);
+    });
+    let trackingCapacity = MIN_TARGETS;
+    Object.keys(accByCount).forEach(function (key) {
+      const avg = mean(accByCount[key]);
+      if (avg >= 0.8 && Number(key) > trackingCapacity) trackingCapacity = Number(key);
+    });
+
+    const summary = {
+      n_trials: trials.length,
+      tracking_accuracy: mean(trials.map(function (t) { return t.tracking_accuracy; })),
+      tracking_capacity: trackingCapacity,
+      ending_n_targets: nTargets,
+    };
+
+    fetch(submitUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+      body: JSON.stringify({ trials: trials, summary: summary }),
+    }).then(function (r) {
+      if (!r.ok && r.status !== 409) throw new Error('save failed');
+      document.getElementById('jspsych-target').style.display = 'none';
+      document.getElementById('thanksMsg').style.display = 'block';
+    }).catch(function () {
+      alert('저장에 실패했습니다. 다시 시도해주세요.');
+    });
+  }
+
+  nextTrial();
+}
+</script>
+{% endblock %}

@@ -2,6 +2,7 @@ import json
 
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.shortcuts import render, get_object_or_404
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
 from invites.decorators import candidate_required
@@ -11,6 +12,7 @@ from .survey_definition import QUESTION_TEXT
 
 
 @candidate_required
+@xframe_options_sameorigin
 def survey_detail(request, pk):
     survey = get_object_or_404(Survey, pk=pk)
     return render(request, 'traits/survey_detail.html', {

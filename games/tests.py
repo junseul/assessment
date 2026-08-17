@@ -13,7 +13,8 @@ from .models import GameResult
 class GameSubmitTests(TestCase):
     def setUp(self):
         self.candidate = login_candidate(self.client)
-        self.url = reverse('games:submit_result')
+        self.slug = 'radar-control'
+        self.url = reverse('games:submit_result', args=[self.slug])
         self.payload = {
             'trials': [{'trial_stage': 'go', 'correct': True, 'rt': 300}],
             'summary': {'accuracy': 1, 'avg_rt_ms': 300, 'n_trials': 1},
@@ -36,6 +37,18 @@ class GameSubmitTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(GameResult.objects.filter(respondent_email=self.candidate.email).exists())
 
+    def test_unknown_slug_rejected_on_submit(self):
+        response = self.client.post(
+            reverse('games:submit_result', args=['not-a-real-game']),
+            data=json.dumps(self.payload),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_unknown_slug_404s_on_play(self):
+        response = self.client.get(reverse('games:play', args=['not-a-real-game']))
+        self.assertEqual(response.status_code, 404)
+
     def test_duplicate_rejected(self):
         self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
         response = self.client.post(
@@ -49,17 +62,36 @@ class GameSubmitTests(TestCase):
     def test_already_done_page(self):
         GameResult.objects.create(
             candidate=self.candidate,
+            game_slug=self.slug,
             respondent_email=self.candidate.email,
             trials=[],
             summary={'accuracy': 1, 'avg_rt_ms': 200, 'n_trials': 1},
         )
-        response = self.client.get(reverse('games:go_nogo'))
+        response = self.client.get(reverse('games:play', args=[self.slug]))
         self.assertContains(response, '결과가 저장되었습니다')
 
     def test_game_accepts_browser_keyboard_events(self):
-        response = self.client.get(reverse('games:go_nogo'))
+        response = self.client.get(reverse('games:play', args=[self.slug]))
         self.assertContains(response, 'choices: "ALL_KEYS"')
         self.assertContains(response, "compareKeys(data.response, ' ')")
+
+    def test_play_page_is_frameable_from_same_origin(self):
+        # Admin's local-test grid (games.views.admin_grid) embeds this page
+        # in an iframe; Django's default X-Frame-Options: DENY would silently
+        # block it.
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertEqual(response.headers.get('X-Frame-Options'), 'SAMEORIGIN')
+
+    def test_index_lists_all_nine_games_as_playable(self):
+        response = self.client.get(reverse('games:index'))
+        self.assertEqual(response.status_code, 200)
+        for title in [
+            '레이더 관제', '긴급 제동', '물류 분류센터', '우주기지 일정관리', '드론 추적',
+            '품질검사관', '암호 연구소', '순간 통신', '탐사대 투자',
+        ]:
+            self.assertContains(response, title)
+        self.assertNotContains(response, '준비중')
+        self.assertContains(response, '시작하기', count=9)
 
     def test_same_email_candidates_are_isolated(self):
         self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
@@ -73,3 +105,184 @@ class GameSubmitTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(GameResult.objects.filter(candidate=other).exists())
 
+
+class EmergencyBrakeTests(TestCase):
+    def setUp(self):
+        self.candidate = login_candidate(self.client)
+        self.slug = 'emergency-brake'
+        self.url = reverse('games:submit_result', args=[self.slug])
+        self.payload = {
+            'trials': [{'trial_stage': 'go', 'correct': True, 'rt': 300, 'ssd_ms': None}],
+            'summary': {'mean_go_rt_ms': 300, 'ssrt_ms': 210, 'stop_success_rate': 0.5},
+        }
+
+    def test_game_renders_stop_signal_staircase(self):
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, 'choices: "ALL_KEYS"')
+        self.assertContains(response, 'stop-armed')
+        self.assertContains(response, 'SSD_STEP_MS')
+
+    def test_submit_ok(self):
+        response = self.client.post(
+            self.url, data=json.dumps(self.payload), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(GameResult.objects.filter(candidate=self.candidate, game_slug=self.slug).exists())
+
+    def test_already_done_page(self):
+        GameResult.objects.create(
+            candidate=self.candidate,
+            game_slug=self.slug,
+            respondent_email=self.candidate.email,
+            trials=[],
+            summary={'ssrt_ms': 200},
+        )
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, '결과가 저장되었습니다')
+
+
+class SortingCenterTests(TestCase):
+    def setUp(self):
+        self.candidate = login_candidate(self.client)
+        self.slug = 'sorting-center'
+        self.url = reverse('games:submit_result', args=[self.slug])
+        self.payload = {
+            'trials': [{'trial_stage': 'sort', 'rule': 'color', 'is_switch': False, 'correct': True, 'rt': 500}],
+            'summary': {'switch_cost_ms': 120, 'perseverative_error_count': 1},
+        }
+
+    def test_game_renders_rule_cue(self):
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, '색상 기준')
+        self.assertContains(response, 'is_perseverative_error')
+
+    def test_submit_ok(self):
+        response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(GameResult.objects.filter(candidate=self.candidate, game_slug=self.slug).exists())
+
+
+class QualityInspectorTests(TestCase):
+    def setUp(self):
+        self.candidate = login_candidate(self.client)
+        self.slug = 'quality-inspector'
+        self.url = reverse('games:submit_result', args=[self.slug])
+        self.payload = {
+            'trials': [{'trial_stage': 'search', 'set_size': 20, 'has_target': True, 'correct': True, 'rt': 900}],
+            'summary': {'search_slope_ms_per_item': 12.5},
+        }
+
+    def test_game_renders_search_grid(self):
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, "choices: ['f', 'j']")
+        self.assertContains(response, 'search-grid')
+
+    def test_submit_ok(self):
+        response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(GameResult.objects.filter(candidate=self.candidate, game_slug=self.slug).exists())
+
+
+class DroneTrackingTests(TestCase):
+    def setUp(self):
+        self.candidate = login_candidate(self.client)
+        self.slug = 'drone-tracking'
+        self.url = reverse('games:submit_result', args=[self.slug])
+        self.payload = {
+            'trials': [{'trial_stage': 'mot', 'n_targets': 2, 'tracking_accuracy': 1, 'fully_correct': True}],
+            'summary': {'tracking_accuracy': 1, 'tracking_capacity': 2},
+        }
+
+    def test_game_renders_arena(self):
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, 'motArena')
+        self.assertContains(response, 'target-highlight')
+
+    def test_submit_ok(self):
+        response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(GameResult.objects.filter(candidate=self.candidate, game_slug=self.slug).exists())
+
+
+class CipherLabTests(TestCase):
+    def setUp(self):
+        self.candidate = login_candidate(self.client)
+        self.slug = 'cipher-lab'
+        self.url = reverse('games:submit_result', args=[self.slug])
+        self.payload = {
+            'trials': [{'trial_stage': 'cipher', 'tier': 1, 'correct': True, 'rt': 2000}],
+            'summary': {'complexity_threshold': 2},
+        }
+
+    def test_game_renders_option_grid(self):
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, "choices: ['1', '2', '3', '4']")
+        self.assertContains(response, 'cipher-panel')
+
+    def test_submit_ok(self):
+        response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(GameResult.objects.filter(candidate=self.candidate, game_slug=self.slug).exists())
+
+
+class SpaceStationScheduleTests(TestCase):
+    def setUp(self):
+        self.candidate = login_candidate(self.client)
+        self.slug = 'space-station-schedule'
+        self.url = reverse('games:submit_result', args=[self.slug])
+        self.payload = {
+            'trials': [{'trial_stage': 'ongoing', 'correct': True, 'rt': 700}],
+            'summary': {'overall_pm_accuracy': 0.75, 'clock_check_count': 3},
+        }
+
+    def test_game_renders_dual_task(self):
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, '시간 확인')
+        self.assertContains(response, 'EVENT_CUE_INDICES')
+
+    def test_submit_ok(self):
+        response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(GameResult.objects.filter(candidate=self.candidate, game_slug=self.slug).exists())
+
+
+class FlashCommTests(TestCase):
+    def setUp(self):
+        self.candidate = login_candidate(self.client)
+        self.slug = 'flash-comm'
+        self.url = reverse('games:submit_result', args=[self.slug])
+        self.payload = {
+            'trials': [{'lag': 2, 't1_correct': True, 't2_correct': False}],
+            'summary': {'t2_given_t1_accuracy': 0.4, 'accuracy_by_lag': {'2': 0.4}},
+        }
+
+    def test_game_renders_rsvp_stream(self):
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, 'rsvp-item')
+        self.assertContains(response, "choices: ['파란색', '주황색']")
+
+    def test_submit_ok(self):
+        response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(GameResult.objects.filter(candidate=self.candidate, game_slug=self.slug).exists())
+
+
+class ExpeditionInvestmentTests(TestCase):
+    def setUp(self):
+        self.candidate = login_candidate(self.client)
+        self.slug = 'expedition-investment'
+        self.url = reverse('games:submit_result', args=[self.slug])
+        self.payload = {
+            'trials': [{'trial_stage': 'choice', 'deck': 'C', 'amount': 50, 'is_loss': False, 'phase': 'pre'}],
+            'summary': {'learning_rate': 0.02, 'reversal_adaptation': 0.1},
+        }
+
+    def test_game_renders_deck_choices(self):
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, "'A 지역', 'B 지역', 'C 지역', 'D 지역'")
+        self.assertContains(response, 'REVERSAL_INDEX')
+
+    def test_submit_ok(self):
+        response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(GameResult.objects.filter(candidate=self.candidate, game_slug=self.slug).exists())

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}전략게임{% endblock %}
+{% block content %}
+<div style="max-width: 640px; margin: 40px auto 0;">
+  <h1 style="font-size: 24px;">전략게임</h1>
+  <p style="margin-bottom: 24px;">{{ candidate_name }}님, 아래 9개 과제로 구성된 인지능력 게임입니다. 순서대로 진행해주세요.</p>
+  {% for game in games %}
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+      <div>
+        <h3 style="margin-bottom: 4px;">{{ forloop.counter }}. {{ game.title }}</h3>
+        <p class="meta" style="margin: 0;">{{ game.description }}</p>
+      </div>
+      {% if game.done %}
+        <span class="btn btn-disabled">완료됨</span>
+      {% elif game.implemented %}
+        <a href="{% url 'games:play' game.slug %}" class="btn btn-primary">시작하기</a>
+      {% else %}
+        <span class="badge">준비중</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

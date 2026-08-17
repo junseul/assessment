@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}전략게임: 물류 분류센터{% endblock %}
+{% block extra_head %}
+<script src="https://unpkg.com/jspsych@7.3.4"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+<link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+<style>
+  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
+  .jspsych-btn {
+    font-family: var(--font-body);
+    background: var(--color-volt-violet);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-buttons);
+  }
+  .sort-rule { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+  .sort-item { width: 90px; height: 90px; margin: 0 auto; }
+  .sort-hint { margin-top: 16px; font-size: 13px; color: var(--color-steel-text); }
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width: 640px; margin: 40px auto 0;">
+  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
+    <h1 style="font-size: 24px;">전략게임 · 물류 분류센터 (3/9)</h1>
+    <p>{{ candidate_name }}님, 화면 위에 분류 기준("색상 기준" 또는 "모양 기준")이 표시됩니다. 기준에 따라 왼쪽 상품은 왼쪽 화살표, 오른쪽 상품은 오른쪽 화살표로 분류하세요. 기준은 예고 없이 바뀝니다.</p>
+    <button id="startBtn" class="btn btn-primary">게임 시작</button>
+  </div>
+  <div id="jspsych-target" style="display: none;"></div>
+  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+    <h2>완료</h2>
+    <p>결과가 저장되었습니다. 감사합니다.</p>
+    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const submitUrl = '{% url "games:submit_result" slug %}';
+const alreadyDone = {{ already_done|yesno:"true,false" }};
+
+if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
+  document.getElementById('startGate').style.display = 'none';
+  document.getElementById('jspsych-target').style.display = 'block';
+
+  const COLORS = ['#2f6fed', '#f5b301']; // 0=blue, 1=yellow
+  const COLOR_KEYS = ['arrowleft', 'arrowright'];
+  const SHAPE_KEYS = ['arrowleft', 'arrowright']; // 0=circle -> left, 1=square -> right
+
+  // ponytail: fixed step/window heuristic for cue duration, not a tuned model.
+  const CUE_MIN_MS = 700;
+  const CUE_MAX_MS = 2000;
+  const CUE_STEP_MS = 100;
+  let cueDuration = 1500;
+  let recentCorrect = [];
+
+  function registerOutcome(correct) {
+    recentCorrect.push(correct ? 1 : 0);
+    if (recentCorrect.length > 10) recentCorrect.shift();
+    if (recentCorrect.length === 10) {
+      const acc = recentCorrect.reduce(function (a, b) { return a + b; }, 0) / 10;
+      if (acc >= 0.9) cueDuration = Math.max(CUE_MIN_MS, cueDuration - CUE_STEP_MS);
+      else if (acc < 0.7) cueDuration = Math.min(CUE_MAX_MS, cueDuration + CUE_STEP_MS);
+    }
+  }
+
+  function correctKeyFor(rule, colorIdx, shapeIdx) {
+    return rule === 'color' ? COLOR_KEYS[colorIdx] : SHAPE_KEYS[shapeIdx];
+  }
+
+  function mean(values) {
+    return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
+  }
+
+  const jsPsych = initJsPsych({
+    display_element: 'jspsych-target',
+    on_finish: function () {
+      const trials = jsPsych.data.get()
+        .filterCustom(function (t) { return t.trial_stage === 'sort'; })
+        .values();
+
+      const switchTrials = trials.filter(function (t) { return t.is_switch; });
+      const repeatTrials = trials.filter(function (t) { return !t.is_switch; });
+
+      const rtOf = function (list) {
+        return list.filter(function (t) { return t.correct && t.rt !== null; }).map(function (t) { return t.rt; });
+      };
+      const switchRt = mean(rtOf(switchTrials));
+      const repeatRt = mean(rtOf(repeatTrials));
+      const switchCost = (switchRt !== null && repeatRt !== null) ? switchRt - repeatRt : null;
+
+      const switchErrorRate = switchTrials.length
+        ? switchTrials.filter(function (t) { return !t.correct; }).length / switchTrials.length : null;
+      const repeatErrorRate = repeatTrials.length
+        ? repeatTrials.filter(function (t) { return !t.correct; }).length / repeatTrials.length : null;
+      const perseverativeErrors = switchTrials.filter(function (t) { return t.is_perseverative_error; }).length;
+
+      const summary = {
+        n_trials: trials.length,
+        repeat_rt_ms: repeatRt,
+        switch_rt_ms: switchRt,
+        switch_cost_ms: switchCost,
+        switch_error_rate: switchErrorRate,
+        repeat_error_rate: repeatErrorRate,
+        perseverative_error_count: perseverativeErrors,
+        ending_cue_duration_ms: cueDuration,
+      };
+
+      fetch(submitUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ trials: trials, summary: summary }),
+      }).then(function (r) {
+        if (!r.ok && r.status !== 409) throw new Error('save failed');
+        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('thanksMsg').style.display = 'block';
+      }).catch(function () {
+        alert('저장에 실패했습니다. 다시 시도해주세요.');
+      });
+    },
+  });
+
+  const N_TRIALS = 120;
+  const SWITCH_RATE = 0.5;
+
+  const timeline = [];
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus:
+      '<p>"색상 기준"이 뜨면 파란 상품은 왼쪽 화살표, 노란 상품은 오른쪽 화살표.<br>' +
+      '"모양 기준"이 뜨면 동그란 상품은 왼쪽 화살표, 네모난 상품은 오른쪽 화살표.</p>' +
+      '<p>준비되면 스페이스바를 누르세요.</p>',
+    choices: "ALL_KEYS",
+  });
+
+  let prevRule = null;
+  for (let i = 0; i < N_TRIALS; i++) {
+    let rule;
+    if (prevRule === null) {
+      rule = Math.random() < 0.5 ? 'color' : 'shape';
+    } else {
+      rule = Math.random() < SWITCH_RATE ? (prevRule === 'color' ? 'shape' : 'color') : prevRule;
+    }
+    const isSwitch = prevRule !== null && rule !== prevRule;
+    const colorIdx = Math.random() < 0.5 ? 0 : 1;
+    const shapeIdx = Math.random() < 0.5 ? 0 : 1;
+    const correctKey = correctKeyFor(rule, colorIdx, shapeIdx);
+    const prevRuleCorrectKey = prevRule ? correctKeyFor(prevRule, colorIdx, shapeIdx) : null;
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: '',
+      choices: 'NO_KEYS',
+      trial_duration: function () { return 300 + Math.floor(Math.random() * 200); },
+    });
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus:
+        '<div class="sort-rule">' + (rule === 'color' ? '색상 기준' : '모양 기준') + '</div>' +
+        '<div class="sort-item" style="background:' + COLORS[colorIdx] + ';' +
+        (shapeIdx === 0 ? 'border-radius:50%;' : 'border-radius:8px;') + '"></div>' +
+        '<div class="sort-hint">← 왼쪽 상품 / 오른쪽 상품 →</div>',
+      choices: ['arrowleft', 'arrowright'],
+      trial_duration: function () { return cueDuration; },
+      data: {
+        trial_stage: 'sort', rule: rule, is_switch: isSwitch,
+        color_idx: colorIdx, shape_idx: shapeIdx,
+      },
+      on_finish: function (data) {
+        data.correct = jsPsych.pluginAPI.compareKeys(data.response, correctKey);
+        data.is_perseverative_error = Boolean(
+          isSwitch && !data.correct && prevRuleCorrectKey &&
+          jsPsych.pluginAPI.compareKeys(data.response, prevRuleCorrectKey)
+        );
+        registerOutcome(data.correct);
+      },
+    });
+
+    prevRule = rule;
+  }
+
+  jsPsych.run(timeline);
+});
+</script>
+{% endblock %}

@@ -3,12 +3,14 @@
 
 {% block extrastyle %}
   {{ block.super }}
-  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css">
   <link rel="stylesheet" href="{% static 'css/admin-theme.css' %}">
 {% endblock %}
 
+{% block extrahead %}{{ block.super }}<link rel="icon" href="{% static 'icons/assessment.svg' %}" type="image/svg+xml">{% endblock %}
+
 {% block branding %}
-<h1 id="site-name"><a href="{% url 'admin:index' %}">역량검사 관리자</a></h1>
+<h1 id="site-name"><a href="{% url 'admin:index' %}"><img class="admin-brand-icon" src="{% static 'icons/assessment.svg' %}" alt="">역량검사 관리자</a></h1>
 {% endblock %}
 
 {% block userlinks %}

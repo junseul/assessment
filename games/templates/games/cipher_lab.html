@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}전략게임: 암호 연구소{% endblock %}
+{% block extra_head %}
+<script src="https://unpkg.com/jspsych@7.3.4"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
+<link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+<style>
+  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
+  .jspsych-btn {
+    font-family: var(--font-body);
+    background: var(--color-volt-violet);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-buttons);
+  }
+  .cipher-row { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 12px 0; }
+  .cipher-panel { display: flex; gap: 4px; align-items: center; justify-content: center; min-height: 60px; min-width: 60px; background: #fff; border: 1px solid var(--color-ash-border); border-radius: 8px; padding: 8px; }
+  .cipher-arrow-sep { font-size: 18px; color: var(--color-fog-text); }
+  .cipher-option-num { text-align: center; font-size: 12px; color: var(--color-steel-text); margin-top: 4px; }
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width: 640px; margin: 40px auto 0;">
+  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
+    <h1 style="font-size: 24px;">전략게임 · 암호 연구소 (6/9)</h1>
+    <p>{{ candidate_name }}님, 화살표 기호가 규칙에 따라 변합니다. 앞의 3단계를 보고 규칙을 찾아, 다음에 올 4번째 상태와 같은 번호를 선택하세요.</p>
+    <button id="startBtn" class="btn btn-primary">게임 시작</button>
+  </div>
+  <div id="jspsych-target" style="display: none;"></div>
+  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+    <h2>완료</h2>
+    <p>결과가 저장되었습니다. 감사합니다.</p>
+    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const submitUrl = '{% url "games:submit_result" slug %}';
+const alreadyDone = {{ already_done|yesno:"true,false" }};
+
+if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
+  document.getElementById('startGate').style.display = 'none';
+  document.getElementById('jspsych-target').style.display = 'block';
+
+  // Simplified rule families: rotation / count / size, single-attribute at
+  // tier 1-2 and two simultaneous attributes at tier 3. Real Raven's-style
+  // XOR/결합/교차 items need a much larger generative model than fits here.
+  const RULE_ATTRS = ['rotation', 'count', 'size'];
+  const RULE_LABELS = { rotation: '회전', count: '수량변화', size: '크기변화' };
+  const TIER_STEP = {
+    1: { rotation: 90, count: 1, size: 20 },
+    2: { rotation: 30, count: 1, size: 8 },
+    3: { rotation: 90, count: 1, size: 20 },
+  };
+  const BASE = { rotation: 0, count: 2, size: 36 };
+
+  function clampState(s) {
+    return {
+      rotation: ((s.rotation % 360) + 360) % 360,
+      count: Math.max(1, Math.min(6, s.count)),
+      size: Math.max(18, Math.min(90, s.size)),
+    };
+  }
+
+  function renderPanel(state) {
+    let inner = '';
+    for (let i = 0; i < state.count; i++) {
+      inner += '<span style="font-size:' + state.size + 'px; line-height:1; transform:rotate(' + state.rotation + 'deg); color:#2f6fed; display:inline-block;">&#10148;</span>';
+    }
+    return '<div class="cipher-panel">' + inner + '</div>';
+  }
+
+  function generateItem(tier) {
+    const shuffledAttrs = RULE_ATTRS.slice().sort(function () { return Math.random() - 0.5; });
+    const activeAttrs = tier === 3 ? shuffledAttrs.slice(0, 2) : shuffledAttrs.slice(0, 1);
+    const step = TIER_STEP[tier];
+
+    function stateAtStep(k) {
+      const s = Object.assign({}, BASE);
+      activeAttrs.forEach(function (attr) { s[attr] = BASE[attr] + k * step[attr]; });
+      return clampState(s);
+    }
+
+    const panels = [stateAtStep(0), stateAtStep(1), stateAtStep(2)];
+    const correct = stateAtStep(3);
+
+    // distractors: overshoot (k=5), regress from panel index 2, and a
+    // "wrong attribute changed" variant that leaves the active attr(s) frozen
+    const overshoot = (function () {
+      const s = Object.assign({}, BASE);
+      activeAttrs.forEach(function (attr) { s[attr] = BASE[attr] + 5 * step[attr]; });
+      return clampState(s);
+    })();
+    const regress = (function () {
+      const s = Object.assign({}, panels[1]);
+      return clampState(s);
+    })();
+    const wrongAttr = (function () {
+      const s = Object.assign({}, panels[2]);
+      const inactive = RULE_ATTRS.filter(function (a) { return activeAttrs.indexOf(a) === -1; })[0];
+      if (inactive) s[inactive] = BASE[inactive] + step[inactive];
+      return clampState(s);
+    })();
+
+    const options = jsPsych.randomization.shuffle([
+      { state: correct, isCorrect: true },
+      { state: overshoot, isCorrect: false },
+      { state: regress, isCorrect: false },
+      { state: wrongAttr, isCorrect: false },
+    ]);
+    const correctIndex = options.findIndex(function (o) { return o.isCorrect; });
+
+    return {
+      tier: tier,
+      ruleLabel: activeAttrs.map(function (a) { return RULE_LABELS[a]; }).join(' + '),
+      panels: panels,
+      options: options.map(function (o) { return o.state; }),
+      correctIndex: correctIndex,
+    };
+  }
+
+  function mean(values) {
+    return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
+  }
+
+  let tier = 1;
+  let streak = 0;
+  let currentItem = null;
+
+  const jsPsych = initJsPsych({
+    display_element: 'jspsych-target',
+    on_finish: function () {
+      const trials = jsPsych.data.get()
+        .filterCustom(function (t) { return t.trial_stage === 'cipher'; })
+        .values();
+
+      const accuracy = trials.length ? trials.filter(function (t) { return t.correct; }).length / trials.length : null;
+      const meanRt = mean(trials.filter(function (t) { return t.rt !== null; }).map(function (t) { return t.rt; }));
+
+      const accByTier = {};
+      trials.forEach(function (t) {
+        const key = String(t.tier);
+        (accByTier[key] = accByTier[key] || []).push(t.correct ? 1 : 0);
+      });
+      const accuracyByTier = {};
+      Object.keys(accByTier).forEach(function (key) { accuracyByTier[key] = mean(accByTier[key]); });
+
+      let complexityThreshold = 1;
+      Object.keys(accuracyByTier).forEach(function (key) {
+        if (accuracyByTier[key] >= 0.6 && Number(key) > complexityThreshold) complexityThreshold = Number(key);
+      });
+
+      const summary = {
+        n_trials: trials.length,
+        accuracy: accuracy,
+        mean_rt_ms: meanRt,
+        accuracy_by_tier: accuracyByTier,
+        complexity_threshold: complexityThreshold,
+      };
+
+      fetch(submitUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ trials: trials, summary: summary }),
+      }).then(function (r) {
+        if (!r.ok && r.status !== 409) throw new Error('save failed');
+        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('thanksMsg').style.display = 'block';
+      }).catch(function () {
+        alert('저장에 실패했습니다. 다시 시도해주세요.');
+      });
+    },
+  });
+
+  const N_ITEMS = 20;
+  const timeline = [];
+
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: '<p>기호가 규칙에 따라 변합니다. 앞 3단계를 보고 4번째 상태를 골라 아래 번호 버튼을 누르세요.</p><p>준비되면 스페이스바를 누르세요.</p>',
+    choices: "ALL_KEYS",
+  });
+
+  for (let i = 0; i < N_ITEMS; i++) {
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: function () {
+        currentItem = generateItem(tier);
+        let html = '<div class="cipher-row">';
+        currentItem.panels.forEach(function (p, idx) {
+          html += renderPanel(p);
+          if (idx < currentItem.panels.length - 1) html += '<span class="cipher-arrow-sep">&rarr;</span>';
+        });
+        html += '<span class="cipher-arrow-sep">&rarr;</span><div class="cipher-panel">?</div></div>';
+        html += '<div class="cipher-row">';
+        currentItem.options.forEach(function (opt) { html += renderPanel(opt); });
+        html += '</div>';
+        html += '<div class="cipher-row">' +
+          currentItem.options.map(function (_, idx) { return '<div class="cipher-option-num" style="width:76px;">' + (idx + 1) + '</div>'; }).join('') +
+          '</div>';
+        return html;
+      },
+      choices: ['1', '2', '3', '4'],
+      data: { trial_stage: 'cipher' },
+      on_finish: function (data) {
+        data.correct = Number(data.response) === currentItem.correctIndex;
+        data.tier = currentItem.tier;
+        data.rule = currentItem.ruleLabel;
+
+        if (data.correct) {
+          streak++;
+          if (streak >= 2) { tier = Math.min(3, tier + 1); streak = 0; }
+        } else {
+          streak = 0;
+          tier = Math.max(1, tier - 1);
+        }
+      },
+    });
+  }
+
+  jsPsych.run(timeline);
+});
+</script>
+{% endblock %}

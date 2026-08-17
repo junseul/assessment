@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}전략게임: 품질검사관{% endblock %}
+{% block extra_head %}
+<script src="https://unpkg.com/jspsych@7.3.4"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+<link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+<style>
+  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
+  .jspsych-btn {
+    font-family: var(--font-body);
+    background: var(--color-volt-violet);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-buttons);
+  }
+  .search-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 480px; margin: 0 auto; }
+  .search-item { width: 28px; height: 28px; border-radius: 6px; background: #2f6fed; }
+  .search-item.odd { background: #f5b301; transform: rotate(45deg); }
+  .search-hint { margin-top: 20px; font-size: 13px; color: var(--color-steel-text); }
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width: 640px; margin: 40px auto 0;">
+  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
+    <h1 style="font-size: 24px;">전략게임 · 품질검사관 (4/9)</h1>
+    <p>{{ candidate_name }}님, 화면에 부품 묶음이 나타납니다. 다른 색으로 돌아간 불량품이 있으면 F, 없으면 J를 최대한 빨리 누르세요.</p>
+    <button id="startBtn" class="btn btn-primary">게임 시작</button>
+  </div>
+  <div id="jspsych-target" style="display: none;"></div>
+  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+    <h2>완료</h2>
+    <p>결과가 저장되었습니다. 감사합니다.</p>
+    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const submitUrl = '{% url "games:submit_result" slug %}';
+const alreadyDone = {{ already_done|yesno:"true,false" }};
+
+if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
+  document.getElementById('startGate').style.display = 'none';
+  document.getElementById('jspsych-target').style.display = 'block';
+
+  // Present/absent detection variant of visual search (Treisman-style), rather
+  // than click-to-localize: keeps the response binary and keyboard-based, and
+  // still yields Search RT / Accuracy / False Alarm / Miss / set-size slope.
+  function buildGrid(setSize, hasTarget) {
+    const targetPos = hasTarget ? Math.floor(Math.random() * setSize) : -1;
+    let html = '<div class="search-grid">';
+    for (let i = 0; i < setSize; i++) {
+      html += '<div class="search-item' + (i === targetPos ? ' odd' : '') + '"></div>';
+    }
+    html += '</div><div class="search-hint">불량품이 있으면 F, 없으면 J</div>';
+    return html;
+  }
+
+  function mean(values) {
+    return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
+  }
+
+  // simple OLS slope of RT (ms) per additional item
+  function searchSlope(points) {
+    const n = points.length;
+    if (n < 2) return null;
+    const mx = mean(points.map(function (p) { return p.x; }));
+    const my = mean(points.map(function (p) { return p.y; }));
+    let num = 0, den = 0;
+    points.forEach(function (p) {
+      num += (p.x - mx) * (p.y - my);
+      den += (p.x - mx) * (p.x - mx);
+    });
+    return den === 0 ? null : num / den;
+  }
+
+  const jsPsych = initJsPsych({
+    display_element: 'jspsych-target',
+    on_finish: function () {
+      const trials = jsPsych.data.get()
+        .filterCustom(function (t) { return t.trial_stage === 'search'; })
+        .values();
+
+      const correctTrials = trials.filter(function (t) { return t.correct && t.rt !== null; });
+      const accuracy = trials.length ? trials.filter(function (t) { return t.correct; }).length / trials.length : null;
+      const meanRt = mean(correctTrials.map(function (t) { return t.rt; }));
+
+      const presentTrials = trials.filter(function (t) { return t.has_target; });
+      const absentTrials = trials.filter(function (t) { return !t.has_target; });
+      const missRate = presentTrials.length
+        ? presentTrials.filter(function (t) { return !t.correct; }).length / presentTrials.length : null;
+      const falseAlarmRate = absentTrials.length
+        ? absentTrials.filter(function (t) { return !t.correct; }).length / absentTrials.length : null;
+
+      const slope = searchSlope(correctTrials.map(function (t) { return { x: t.set_size, y: t.rt }; }));
+
+      const summary = {
+        n_trials: trials.length,
+        accuracy: accuracy,
+        mean_search_rt_ms: meanRt,
+        miss_rate: missRate,
+        false_alarm_rate: falseAlarmRate,
+        search_slope_ms_per_item: slope,
+      };
+
+      fetch(submitUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ trials: trials, summary: summary }),
+      }).then(function (r) {
+        if (!r.ok && r.status !== 409) throw new Error('save failed');
+        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('thanksMsg').style.display = 'block';
+      }).catch(function () {
+        alert('저장에 실패했습니다. 다시 시도해주세요.');
+      });
+    },
+  });
+
+  const N_TRIALS = 100;
+  const BASE_SET_SIZES = [10, 20, 30, 40];
+  let setSizeShift = 0; // ponytail: two-phase shift, not per-trial adaptation (keeps set-size variance for the slope calc)
+  let firstHalfCorrect = 0;
+
+  const timeline = [];
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: '<p>부품 묶음 속에 색이 다른 불량품이 있으면 F, 없으면 J를 누르세요.</p><p>준비되면 스페이스바를 누르세요.</p>',
+    choices: "ALL_KEYS",
+  });
+
+  for (let i = 0; i < N_TRIALS; i++) {
+    if (i === Math.floor(N_TRIALS / 2)) {
+      const acc = firstHalfCorrect / Math.floor(N_TRIALS / 2);
+      if (acc >= 0.9) setSizeShift = 10;
+      else if (acc < 0.7) setSizeShift = -5;
+    }
+    const sizes = BASE_SET_SIZES.map(function (s) { return Math.max(5, s + setSizeShift); });
+    const setSize = sizes[Math.floor(Math.random() * sizes.length)];
+    const hasTarget = Math.random() < 0.5;
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: '',
+      choices: 'NO_KEYS',
+      trial_duration: function () { return 300 + Math.floor(Math.random() * 200); },
+    });
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: buildGrid(setSize, hasTarget),
+      choices: ['f', 'j'],
+      trial_duration: 4000,
+      data: { trial_stage: 'search', set_size: setSize, has_target: hasTarget },
+      on_finish: function (data) {
+        const saidPresent = data.response === 'f';
+        data.correct = saidPresent === hasTarget;
+        if (i < Math.floor(N_TRIALS / 2) && data.correct) firstHalfCorrect++;
+      },
+    });
+  }
+
+  jsPsych.run(timeline);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}전략게임: 긴급 제동{% endblock %}
+{% block extra_head %}
+<script src="https://unpkg.com/jspsych@7.3.4"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+<link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+<style>
+  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
+  .jspsych-btn {
+    font-family: var(--font-body);
+    background: var(--color-volt-violet);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-buttons);
+  }
+  .brake-box { width: 140px; height: 90px; margin: 0 auto; border-radius: 8px; background: #22a06b; border: 4px solid transparent; }
+  .brake-box.stop-armed { animation: stopSignalReveal 0.01s linear forwards; }
+  @keyframes stopSignalReveal { to { background: #e5484d; border-color: #7a1f22; } }
+  .brake-label { margin-top: 16px; font-size: 14px; color: var(--color-steel-text); }
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width: 640px; margin: 40px auto 0;">
+  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
+    <h1 style="font-size: 24px;">전략게임 · 긴급 제동 (2/9)</h1>
+    <p>{{ candidate_name }}님, 제품이 나오면 최대한 빨리 스페이스바로 승인하세요. 단, 승인하기 전에 상자가 빨갛게 바뀌며 정지 신호가 뜨면 절대 누르지 마세요. 반응 속도와 억제 조절 능력을 함께 측정합니다.</p>
+    <button id="startBtn" class="btn btn-primary">게임 시작</button>
+  </div>
+  <div id="jspsych-target" style="display: none;"></div>
+  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+    <h2>완료</h2>
+    <p>결과가 저장되었습니다. 감사합니다.</p>
+    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const submitUrl = '{% url "games:submit_result" slug %}';
+const alreadyDone = {{ already_done|yesno:"true,false" }};
+
+if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
+  document.getElementById('startGate').style.display = 'none';
+  document.getElementById('jspsych-target').style.display = 'block';
+
+  // ---- Stop-Signal Delay staircase ----
+  // ponytail: fixed step/bounds heuristic tuned to converge stop-success near 50%,
+  // not a validated clinical parameterization. Revisit once real data comes in.
+  const SSD_MIN_MS = 50;
+  const SSD_MAX_MS = 900;
+  const SSD_STEP_MS = 50;
+  const GO_RT_MIN_MS = 150; // faster than this on a Go trial = premature, not a real decision
+  const RESPONSE_WINDOW_MS = 1000;
+  let ssd = 250;
+
+  function median(values) {
+    if (!values.length) return null;
+    const sorted = values.slice().sort(function (a, b) { return a - b; });
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  function mean(values) {
+    return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
+  }
+
+  const jsPsych = initJsPsych({
+    display_element: 'jspsych-target',
+    on_finish: function () {
+      const gameTrials = jsPsych.data.get()
+        .filterCustom(function (t) { return t.trial_stage === 'go' || t.trial_stage === 'stop'; })
+        .values();
+
+      const goTrials = gameTrials.filter(function (t) { return t.trial_stage === 'go'; });
+      const stopTrials = gameTrials.filter(function (t) { return t.trial_stage === 'stop'; });
+
+      const goRTsValid = goTrials
+        .filter(function (t) { return t.response !== null && t.rt >= GO_RT_MIN_MS; })
+        .map(function (t) { return t.rt; });
+      const prematureCount = goTrials.filter(function (t) { return t.response !== null && t.rt < GO_RT_MIN_MS; }).length;
+      const missCount = goTrials.filter(function (t) { return t.response === null; }).length;
+      const meanGoRt = mean(goRTsValid);
+      const medianGoRt = median(goRTsValid);
+
+      // SSRT mean method: omissions on Go trials are replaced with the response
+      // window (Verbruggen et al. 2019 consensus recommendation) so a high miss
+      // rate doesn't silently deflate the estimate.
+      const goRTsForSsrt = goTrials.map(function (t) {
+        return t.response !== null ? t.rt : RESPONSE_WINDOW_MS;
+      });
+      const meanGoRtForSsrt = mean(goRTsForSsrt);
+      const stopSsds = stopTrials.map(function (t) { return t.ssd_ms; });
+      const meanSsd = mean(stopSsds);
+      const ssrt = (meanGoRtForSsrt !== null && meanSsd !== null) ? meanGoRtForSsrt - meanSsd : null;
+
+      const stopSuccessCount = stopTrials.filter(function (t) { return t.correct; }).length;
+      const stopSuccessRate = stopTrials.length ? stopSuccessCount / stopTrials.length : null;
+
+      const summary = {
+        n_trials: gameTrials.length,
+        mean_go_rt_ms: meanGoRt,
+        median_go_rt_ms: medianGoRt,
+        go_miss_rate: goTrials.length ? missCount / goTrials.length : null,
+        premature_response_count: prematureCount,
+        stop_success_rate: stopSuccessRate,
+        mean_ssd_ms: meanSsd,
+        ssrt_ms: ssrt,
+        ending_ssd_ms: ssd,
+        flags: {
+          high_miss_rate: goTrials.length ? (missCount / goTrials.length) > 0.3 : false,
+          slow_responding: meanGoRt !== null && meanGoRt > RESPONSE_WINDOW_MS * 0.8,
+        },
+      };
+
+      fetch(submitUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ trials: gameTrials, summary: summary }),
+      }).then(function (r) {
+        if (!r.ok && r.status !== 409) throw new Error('save failed');
+        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('thanksMsg').style.display = 'block';
+      }).catch(function () {
+        alert('저장에 실패했습니다. 다시 시도해주세요.');
+      });
+    },
+  });
+
+  const N_TRIALS = 120;
+  const N_STOP = Math.round(N_TRIALS * 0.25);
+  const N_GO = N_TRIALS - N_STOP;
+  const stages = jsPsych.randomization.shuffle(
+    Array(N_GO).fill('go').concat(Array(N_STOP).fill('stop'))
+  );
+
+  const timeline = [];
+
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus:
+      '<p>제품이 나오면 최대한 빨리 스페이스바를 눌러 승인하세요.<br>' +
+      '상자가 빨갛게 바뀌며 정지 신호가 뜨면 절대 누르지 마세요.</p>' +
+      '<p>준비되면 스페이스바를 누르세요.</p>',
+    choices: "ALL_KEYS",
+  });
+
+  stages.forEach(function (stage) {
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: '',
+      choices: 'NO_KEYS',
+      trial_duration: function () { return 300 + Math.floor(Math.random() * 200); },
+    });
+
+    // Dynamic parameter functions (stimulus/data) are evaluated by jsPsych right
+    // before each trial renders, so they read the *live* ssd value — unlike a
+    // `const currentSsd = ssd` captured while this whole timeline array is
+    // being built (which would freeze every trial at the starting ssd).
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function () {
+        if (stage !== 'stop') {
+          return '<div class="brake-box"></div><div class="brake-label">승인 대기 중</div>';
+        }
+        return '<div class="brake-box stop-armed" style="animation-delay: ' + ssd + 'ms;"></div>' +
+          '<div class="brake-label">승인 대기 중</div>';
+      },
+      choices: "ALL_KEYS",
+      trial_duration: RESPONSE_WINDOW_MS,
+      data: function () { return { trial_stage: stage, ssd_ms: stage === 'stop' ? ssd : null }; },
+      on_finish: function (data) {
+        data.correct = stage === 'go'
+          ? jsPsych.pluginAPI.compareKeys(data.response, ' ')
+          : data.response === null;
+        if (stage === 'stop') {
+          ssd = data.response === null
+            ? Math.min(SSD_MAX_MS, ssd + SSD_STEP_MS)
+            : Math.max(SSD_MIN_MS, ssd - SSD_STEP_MS);
+        }
+      },
+    });
+  });
+
+  jsPsych.run(timeline);
+});
+</script>
+{% endblock %}

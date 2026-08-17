@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}전략게임: 탐사대 투자{% endblock %}
+{% block extra_head %}
+<script src="https://unpkg.com/jspsych@7.3.4"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
+<link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+<style>
+  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
+  .jspsych-btn {
+    font-family: var(--font-body);
+    background: var(--color-volt-violet);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-buttons);
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width: 640px; margin: 40px auto 0;">
+  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
+    <h1 style="font-size: 24px;">전략게임 · 탐사대 투자 (9/9)</h1>
+    <p>{{ candidate_name }}님, A~D 네 곳의 탐사지역 중 하나를 반복해서 선택하세요. 각 지역의 정확한 확률은 알려드리지 않으며, 선택할 때마다 자원 증감 결과만 보여드립니다. 자원을 최대한 많이 모으는 것이 목표입니다.</p>
+    <button id="startBtn" class="btn btn-primary">게임 시작</button>
+  </div>
+  <div id="jspsych-target" style="display: none;"></div>
+  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+    <h2>완료</h2>
+    <p>결과가 저장되었습니다. 감사합니다.</p>
+    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const submitUrl = '{% url "games:submit_result" slug %}';
+const alreadyDone = {{ already_done|yesno:"true,false" }};
+
+if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
+  document.getElementById('startGate').style.display = 'none';
+  document.getElementById('jspsych-target').style.display = 'block';
+
+  function mean(values) {
+    return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
+  }
+  function olsSlope(points) {
+    if (points.length < 2) return null;
+    const mx = mean(points.map(function (p) { return p.x; }));
+    const my = mean(points.map(function (p) { return p.y; }));
+    let num = 0, den = 0;
+    points.forEach(function (p) { num += (p.x - mx) * (p.y - my); den += (p.x - mx) * (p.x - mx); });
+    return den === 0 ? null : num / den;
+  }
+
+  const N_TRIALS = 100;
+  const REVERSAL_INDEX = 50; // 0-indexed: trials [0,50) use the base payoff table, [50,100) use it flipped
+
+  // Classic IGT-style structure: A/B look tempting (bigger single win) but are
+  // net-negative; C/D look modest but are net-positive. At the reversal, the
+  // whole payoff table flips onto the same A-D labels.
+  let decks = {
+    A: { winAmt: 100, lossProb: 0.5, lossAmt: 250 },
+    B: { winAmt: 100, lossProb: 0.1, lossAmt: 1250 },
+    C: { winAmt: 50, lossProb: 0.5, lossAmt: 25 },
+    D: { winAmt: 50, lossProb: 0.1, lossAmt: 125 },
+  };
+  function applyReversal() {
+    const a = decks.A, b = decks.B;
+    decks.A = decks.C; decks.B = decks.D; decks.C = a; decks.D = b;
+  }
+
+  let runningTotal = 0;
+  let lastOutcome = null;
+
+  const jsPsych = initJsPsych({
+    display_element: 'jspsych-target',
+    on_finish: function () {
+      const choiceTrials = jsPsych.data.get().filterCustom(function (t) { return t.trial_stage === 'choice'; }).values();
+
+      function proportions(list) {
+        const counts = { A: 0, B: 0, C: 0, D: 0 };
+        list.forEach(function (t) { counts[t.deck]++; });
+        const total = list.length || 1;
+        const props = {};
+        Object.keys(counts).forEach(function (k) { props[k] = counts[k] / total; });
+        return props;
+      }
+      const half = Math.floor(choiceTrials.length / 2);
+      const firstHalfChoiceProportions = proportions(choiceTrials.slice(0, half));
+      const secondHalfChoiceProportions = proportions(choiceTrials.slice(half));
+
+      const seen = { A: { sum: 0, n: 0 }, B: { sum: 0, n: 0 }, C: { sum: 0, n: 0 }, D: { sum: 0, n: 0 } };
+      let explorationCount = 0;
+      choiceTrials.forEach(function (t) {
+        let best = null, bestAvg = -Infinity;
+        Object.keys(seen).forEach(function (k) {
+          if (seen[k].n > 0) { const avg = seen[k].sum / seen[k].n; if (avg > bestAvg) { bestAvg = avg; best = k; } }
+        });
+        if (best !== null && t.deck !== best) explorationCount++;
+        seen[t.deck].sum += t.amount; seen[t.deck].n++;
+      });
+      const explorationRate = choiceTrials.length ? explorationCount / choiceTrials.length : null;
+      const exploitationRate = explorationRate !== null ? 1 - explorationRate : null;
+
+      const blockSize = 10;
+      const blocks = [];
+      for (let b = 0; b * blockSize < choiceTrials.length; b++) {
+        const blockTrials = choiceTrials.slice(b * blockSize, (b + 1) * blockSize);
+        const advCount = blockTrials.filter(function (t) {
+          const advantageous = t.phase === 'pre' ? ['C', 'D'] : ['A', 'B'];
+          return advantageous.indexOf(t.deck) !== -1;
+        }).length;
+        blocks.push({ x: b, y: blockTrials.length ? advCount / blockTrials.length : 0 });
+      }
+      const learningRate = olsSlope(blocks);
+
+      let stays = 0, switches = 0;
+      for (let i = 1; i < choiceTrials.length; i++) {
+        if (choiceTrials[i - 1].is_loss) {
+          if (choiceTrials[i].deck === choiceTrials[i - 1].deck) stays++; else switches++;
+        }
+      }
+      const lossStayRate = (stays + switches) ? stays / (stays + switches) : null;
+
+      function switchRateInRange(lo, hi) {
+        let s = 0, c = 0;
+        for (let i = 1; i < choiceTrials.length; i++) {
+          if (choiceTrials[i].trial_index >= lo && choiceTrials[i].trial_index <= hi) {
+            c++;
+            if (choiceTrials[i].deck !== choiceTrials[i - 1].deck) s++;
+          }
+        }
+        return c ? s / c : null;
+      }
+      const preReversalSwitchRate = switchRateInRange(REVERSAL_INDEX - 10, REVERSAL_INDEX - 1);
+      const postReversalSwitchRate = switchRateInRange(REVERSAL_INDEX, REVERSAL_INDEX + 9);
+      const reversalAdaptation = (preReversalSwitchRate !== null && postReversalSwitchRate !== null)
+        ? postReversalSwitchRate - preReversalSwitchRate : null;
+
+      const summary = {
+        n_trials: choiceTrials.length,
+        final_total: runningTotal,
+        first_half_choice_proportions: firstHalfChoiceProportions,
+        second_half_choice_proportions: secondHalfChoiceProportions,
+        exploration_rate: explorationRate,
+        exploitation_rate: exploitationRate,
+        learning_rate: learningRate,
+        loss_stay_rate: lossStayRate,
+        reversal_adaptation: reversalAdaptation,
+      };
+
+      fetch(submitUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ trials: choiceTrials, summary: summary }),
+      }).then(function (r) {
+        if (!r.ok && r.status !== 409) throw new Error('save failed');
+        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('thanksMsg').style.display = 'block';
+      }).catch(function () {
+        alert('저장에 실패했습니다. 다시 시도해주세요.');
+      });
+    },
+  });
+
+  const timeline = [];
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: '<p>A, B, C, D 네 지역 중 하나를 반복해서 선택하며 자원을 최대한 모으세요.<br>확률은 알려드리지 않습니다.</p><p>준비되면 스페이스바를 누르세요.</p>',
+    choices: "ALL_KEYS",
+  });
+
+  const DECK_LETTERS = ['A', 'B', 'C', 'D'];
+  for (let i = 0; i < N_TRIALS; i++) {
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: function () { return '<p>누적 자원: ' + runningTotal + '</p><p>탐사할 지역을 선택하세요.</p>'; },
+      choices: ['A 지역', 'B 지역', 'C 지역', 'D 지역'],
+      data: { trial_stage: 'choice', trial_index: i },
+      on_finish: function (data) {
+        if (data.trial_index === REVERSAL_INDEX) applyReversal();
+        const deckLetter = DECK_LETTERS[Number(data.response)];
+        const deck = decks[deckLetter];
+        const isLoss = Math.random() < deck.lossProb;
+        const amount = deck.winAmt - (isLoss ? deck.lossAmt : 0);
+        runningTotal += amount;
+        lastOutcome = { deck: deckLetter, amount: amount };
+
+        data.deck = deckLetter;
+        data.amount = amount;
+        data.is_loss = amount < 0;
+        data.running_total = runningTotal;
+        data.phase = data.trial_index < REVERSAL_INDEX ? 'pre' : 'post';
+      },
+    });
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function () {
+        const color = lastOutcome.amount >= 0 ? '#22a06b' : '#e5484d';
+        const sign = lastOutcome.amount >= 0 ? '+' : '';
+        return '<p>' + lastOutcome.deck + ' 지역 결과: <span style="color:' + color + ';font-weight:700;">' +
+          sign + lastOutcome.amount + '</span></p><p>누적 자원: ' + runningTotal + '</p>';
+      },
+      choices: 'NO_KEYS',
+      trial_duration: 1200,
+    });
+  }
+
+  jsPsych.run(timeline);
+});
+</script>
+{% endblock %}

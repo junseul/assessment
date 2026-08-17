@@ -21,6 +21,12 @@ class InterviewSubmitTests(TestCase):
         response = self.client.post(self.url, {'transcript': '안녕하세요'})
         self.assertEqual(response.status_code, 400)
 
+    def test_page_is_frameable_from_same_origin(self):
+        # Admin's local-test iframe (invites.views.local_test) embeds this
+        # page; Django's default X-Frame-Options: DENY would silently block it.
+        response = self.client.get(reverse('interviews:interview_detail'))
+        self.assertEqual(response.headers.get('X-Frame-Options'), 'SAMEORIGIN')
+
     def test_invalid_file_rejected(self):
         response = self.client.post(self.url, {
             'transcript': '안녕하세요',

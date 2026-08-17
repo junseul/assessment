@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}전략게임: 우주기지 일정관리{% endblock %}
+{% block extra_head %}
+<style>
+  #ssArena { background: var(--color-cloud-mist); border-radius: var(--radius-cards); padding: 40px 24px; text-align: center; min-height: 220px; }
+  #ssStim { font-size: 48px; font-weight: 700; min-height: 60px; color: var(--color-graphite-heading); }
+  #ssHint { margin-top: 12px; font-size: 13px; color: var(--color-steel-text); }
+  #ssClockRow { margin-top: 20px; }
+  #clockDisplay { margin-left: 12px; font-family: var(--font-mono); font-size: 14px; }
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width: 640px; margin: 40px auto 0;">
+  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
+    <h1 style="font-size: 24px;">전략게임 · 우주기지 일정관리 (7/9)</h1>
+    <p>{{ candidate_name }}님, 화면에 나오는 숫자가 홀수면 왼쪽 화살표, 짝수면 오른쪽 화살표를 누르는 점검 업무를 계속하세요.</p>
+    <p><strong>단, 두 가지를 기억하세요:</strong> ① 별(★)이 나타나면 P키를 누르세요. ② 시작 후 약 2분, 약 4분이 지나면 P키를 누르세요. 경과 시간은 "시간 확인" 버튼으로 볼 수 있습니다.</p>
+    <button id="startBtn" class="btn btn-primary">게임 시작</button>
+  </div>
+  <div id="jspsych-target" style="display: none;">
+    <div id="ssArena">
+      <div id="ssStim"></div>
+      <div id="ssHint">홀수: ← / 짝수: → / 약속 이행: P</div>
+      <div id="ssClockRow">
+        <button id="clockCheckBtn" class="btn btn-ghost">시간 확인</button>
+        <span id="clockDisplay"></span>
+      </div>
+    </div>
+  </div>
+  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+    <h2>완료</h2>
+    <p>결과가 저장되었습니다. 감사합니다.</p>
+    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const submitUrl = '{% url "games:submit_result" slug %}';
+const alreadyDone = {{ already_done|yesno:"true,false" }};
+
+if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', runGame);
+
+function runGame() {
+  document.getElementById('startGate').style.display = 'none';
+  document.getElementById('jspsych-target').style.display = 'block';
+
+  const stimEl = document.getElementById('ssStim');
+  const clockDisplay = document.getElementById('clockDisplay');
+
+  const SESSION_DURATION_MS = 360000; // 6 min
+  const RESPONSE_WINDOW_MS = 1500;
+  const ISI_MS = 400;
+  const TIME_TARGETS_MS = [120000, 240000]; // event-based promises kept separate from these
+  const TIME_WINDOW_MS = 15000;
+  const EVENT_CUE_INDICES = [
+    20 + Math.floor(Math.random() * 50),
+    100 + Math.floor(Math.random() * 50),
+  ];
+
+  const sessionStart = performance.now();
+  function elapsedMs() { return performance.now() - sessionStart; }
+  function formatTime(ms) {
+    const s = Math.floor(ms / 1000);
+    return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  }
+  function mean(values) {
+    return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
+  }
+
+  const ongoingResults = [];
+  const eventPmResults = [];
+  const timePmResults = TIME_TARGETS_MS.map(function (t) {
+    return { target_elapsed_ms: t, opened: false, opened_at: null, deadline: null, responded: false, rt_ms: null, timing_error_ms: null };
+  });
+  const clockChecks = [];
+  let prematurePmResponseCount = 0;
+  let currentTrial = null;
+
+  function checkTimeWindows() {
+    const now = elapsedMs();
+    timePmResults.forEach(function (w) {
+      if (!w.opened && now >= w.target_elapsed_ms) {
+        w.opened = true;
+        w.opened_at = now;
+        w.deadline = now + TIME_WINDOW_MS;
+      }
+    });
+  }
+
+  function handleKeydown(e) {
+    const key = e.key.toLowerCase();
+    checkTimeWindows();
+    const now = elapsedMs();
+
+    if (key === 'p') {
+      if (currentTrial && currentTrial.type === 'event' && !currentTrial.responded) {
+        currentTrial.responded = true;
+        currentTrial.rt = now - currentTrial.startTime;
+        return;
+      }
+      const openWindow = timePmResults.find(function (w) { return w.opened && !w.responded && now <= w.deadline; });
+      if (openWindow) {
+        openWindow.responded = true;
+        openWindow.rt_ms = now - openWindow.opened_at;
+        openWindow.timing_error_ms = Math.abs(now - openWindow.target_elapsed_ms);
+        return;
+      }
+      prematurePmResponseCount++;
+      return;
+    }
+
+    if ((key === 'arrowleft' || key === 'arrowright') && currentTrial && currentTrial.type === 'number' && !currentTrial.responded) {
+      currentTrial.responded = true;
+      currentTrial.response = key;
+      currentTrial.rt = now - currentTrial.startTime;
+      currentTrial.correct = key === currentTrial.correctKey;
+    }
+  }
+  document.addEventListener('keydown', handleKeydown);
+
+  document.getElementById('clockCheckBtn').addEventListener('click', function () {
+    clockChecks.push(elapsedMs());
+    clockDisplay.textContent = formatTime(elapsedMs());
+    setTimeout(function () { clockDisplay.textContent = ''; }, 1500);
+  });
+
+  function nextOngoingTrial(index) {
+    if (elapsedMs() >= SESSION_DURATION_MS) return finish();
+    checkTimeWindows();
+
+    const isEvent = EVENT_CUE_INDICES.indexOf(index) !== -1;
+    if (isEvent) {
+      stimEl.textContent = '★';
+      currentTrial = { type: 'event', index: index, startTime: elapsedMs(), responded: false, rt: null };
+    } else {
+      const n = 1 + Math.floor(Math.random() * 9);
+      const correctKey = (n % 2 === 0) ? 'arrowright' : 'arrowleft';
+      stimEl.textContent = String(n);
+      currentTrial = {
+        type: 'number', index: index, startTime: elapsedMs(), responded: false,
+        response: null, rt: null, correct: false, correctKey: correctKey, number: n,
+      };
+    }
+
+    setTimeout(function () {
+      if (currentTrial.type === 'number') {
+        ongoingResults.push(currentTrial);
+      } else {
+        eventPmResults.push({ index: currentTrial.index, responded: currentTrial.responded, rt_ms: currentTrial.rt });
+      }
+      currentTrial = null;
+      stimEl.textContent = '';
+      setTimeout(function () { nextOngoingTrial(index + 1); }, ISI_MS);
+    }, RESPONSE_WINDOW_MS);
+  }
+
+  function finish() {
+    document.removeEventListener('keydown', handleKeydown);
+
+    const ongoingAccuracy = ongoingResults.length
+      ? ongoingResults.filter(function (t) { return t.correct; }).length / ongoingResults.length : null;
+    const ongoingMeanRt = mean(
+      ongoingResults.filter(function (t) { return t.correct && t.rt !== null; }).map(function (t) { return t.rt; })
+    );
+
+    const eventHits = eventPmResults.filter(function (r) { return r.responded; }).length;
+    const timeHits = timePmResults.filter(function (r) { return r.responded; }).length;
+    const meanTimingError = mean(
+      timePmResults.filter(function (r) { return r.responded; }).map(function (r) { return r.timing_error_ms; })
+    );
+
+    const trials = ongoingResults
+      .map(function (t) { return Object.assign({ trial_stage: 'ongoing' }, t); })
+      .concat(eventPmResults.map(function (r) { return Object.assign({ trial_stage: 'event_pm' }, r); }))
+      .concat(timePmResults.map(function (r) { return Object.assign({ trial_stage: 'time_pm' }, r); }));
+
+    const summary = {
+      ongoing_accuracy: ongoingAccuracy,
+      ongoing_mean_rt_ms: ongoingMeanRt,
+      event_pm_total: eventPmResults.length,
+      event_pm_hits: eventHits,
+      event_pm_accuracy: eventPmResults.length ? eventHits / eventPmResults.length : null,
+      time_pm_total: timePmResults.length,
+      time_pm_hits: timeHits,
+      time_pm_accuracy: timePmResults.length ? timeHits / timePmResults.length : null,
+      mean_timing_error_ms: meanTimingError,
+      overall_pm_accuracy: (eventPmResults.length + timePmResults.length)
+        ? (eventHits + timeHits) / (eventPmResults.length + timePmResults.length) : null,
+      clock_check_count: clockChecks.length,
+      premature_pm_response_count: prematurePmResponseCount,
+    };
+
+    fetch(submitUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+      body: JSON.stringify({ trials: trials, summary: summary }),
+    }).then(function (r) {
+      if (!r.ok && r.status !== 409) throw new Error('save failed');
+      document.getElementById('jspsych-target').style.display = 'none';
+      document.getElementById('thanksMsg').style.display = 'block';
+    }).catch(function () {
+      alert('저장에 실패했습니다. 다시 시도해주세요.');
+    });
+  }
+
+  nextOngoingTrial(0);
+}
+</script>
+{% endblock %}

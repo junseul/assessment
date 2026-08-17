@@ -53,7 +53,7 @@ DEEPSEEK_API_KEY = os.environ.get('deepseek-api', '')
 SITE_BASE_URL = os.environ.get('SITE_BASE_URL', 'http://127.0.0.1:8000')
 
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'reports:candidate_list'
+LOGIN_REDIRECT_URL = 'admin:index'
 LOGOUT_REDIRECT_URL = 'login'
 
 MIDDLEWARE = [

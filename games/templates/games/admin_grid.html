@@ -1,0 +1,51 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>전략게임 테스트</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/lightdash.css' %}">
+<style>
+  body { padding: 28px 16px; }
+  .grid-heading { text-align: center; margin-bottom: 24px; color: var(--color-graphite-heading); }
+  .game-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4%;
+    width: min(90vw, 640px); margin: 0 auto;
+  }
+  /* lightdash.css's `.card + .card { margin-top: 24px }` is meant for vertically
+     stacked cards. Inside this grid it only hits tiles 2-9 (whichever aren't
+     first in DOM order), pushing them down inside their grid cell relative to
+     the first tile — which is what misaligned radar-control vs. the rest. */
+  .game-grid .card + .card { margin-top: 0; }
+  .game-tile {
+    container-type: inline-size;
+    box-sizing: border-box; width: 100%; aspect-ratio: 162.66 / 102.89;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4%;
+    padding: 10% 6%; text-decoration: none; color: var(--color-graphite-heading);
+    text-align: center;
+  }
+  .game-tile:hover { border-color: #000000; }
+  .game-tile .icon-wrap {
+    flex-shrink: 0; width: 27cqi; height: 27cqi; display: flex; align-items: center; justify-content: center;
+    background: var(--color-cloud-mist); border-radius: var(--radius-buttons); border: max(1px, 0.6cqi) solid #0ea5e9;
+  }
+  .game-tile svg { width: 55%; height: 55%; color: #0ea5e9; }
+  .game-tile span:last-child {
+    font-size: 8cqi; font-weight: 500; line-height: 1.3; width: 100%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+</style>
+</head>
+<body>
+  <h2 class="grid-heading">테스트할 게임을 선택하세요</h2>
+  <div class="game-grid">
+    {% for game in games %}
+    <a class="game-tile card" href="{% url 'games:play' game.slug %}">
+      <span class="icon-wrap"><svg viewBox="0 0 24 24" fill="none">{{ game.icon_svg|safe }}</svg></span>
+      <span>{{ game.title }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</body>
+</html>

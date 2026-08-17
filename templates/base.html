@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}역량검사{% endblock %}</title>
+<link rel="icon" href="{% static 'icons/assessment.svg' %}" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'css/lightdash.css' %}">
@@ -11,7 +12,7 @@
 </head>
 <body>
 <nav class="navbar">
-  <span class="brand">역량검사<span class="dot">.</span></span>
+  <a class="brand" href="/"><img class="brand-icon" src="{% static 'icons/assessment.svg' %}" alt="">역량검사</a>
   <span class="nav-right">
     {% if request.user.is_authenticated %}
       <a href="{% url 'reports:candidate_list' %}">리포트</a>

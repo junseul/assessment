@@ -1,7 +1,7 @@
 /* Lightdash theming for Django admin, via its documented CSS custom properties. */
-:root, html[data-theme="light"] {
+:root, html[data-theme="light"], html[data-theme="dark"] {
     --primary: #ffed00;
-    --secondary: #000000;
+    --secondary: #ffed00;
     --accent: #ffed00;
     --primary-fg: #000000;
 
@@ -16,9 +16,9 @@
     --header-bg: #ffffff;
     --header-link-color: #000000;
 
-    --breadcrumbs-fg: rgba(255,255,255,.72);
-    --breadcrumbs-link-fg: #ffffff;
-    --breadcrumbs-bg: #000000;
+    --breadcrumbs-fg: #333333;
+    --breadcrumbs-link-fg: #000000;
+    --breadcrumbs-bg: #ffed00;
 
     --link-fg: #000000;
     --link-hover-color: #000000;
@@ -38,15 +38,15 @@
     --button-fg: #000000;
     --button-bg: #ffed00;
     --button-hover-bg: #e6d200;
-    --default-button-bg: #000000;
-    --default-button-hover-bg: #111111;
+    --default-button-bg: #ffed00;
+    --default-button-hover-bg: #e6d200;
     --close-button-bg: #818898;
     --close-button-hover-bg: #666d80;
 
-    --object-tools-bg: #000000;
-    --object-tools-hover-bg: #111111;
+    --object-tools-bg: #ffed00;
+    --object-tools-hover-bg: #e6d200;
 
-    --font-family-primary: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
+    --font-family-primary: 'Pretendard', ui-sans-serif, system-ui, sans-serif;
     --lightdash-radius: 0;
     --lightdash-shadow: none;
 }
@@ -68,6 +68,14 @@ body {
     font-family: var(--font-family-primary);
     font-weight: 700;
     letter-spacing: 0;
+    color: #000000;
+}
+
+.admin-brand-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
+    vertical-align: middle;
 }
 
 div.breadcrumbs {
@@ -113,8 +121,8 @@ div.breadcrumbs {
 }
 
 #nav-sidebar .local-test-menu caption {
-    background: #000000;
-    color: #ffffff;
+    background: #ffed00;
+    color: #000000;
 }
 
 #nav-sidebar .local-test-menu th {
@@ -127,7 +135,7 @@ div.breadcrumbs {
 
 #nav-sidebar .current-model a,
 #nav-sidebar a:hover {
-    color: var(--primary);
+    color: #000000;
 }
 
 #content {
@@ -209,7 +217,7 @@ div.breadcrumbs {
 }
 
 .eyebrow {
-    color: var(--primary) !important;
+    color: #665e00 !important;
     font-family: var(--font-family-primary);
     font-size: 11px;
     font-weight: 600;
@@ -232,9 +240,10 @@ div.breadcrumbs {
 .inline-group h2,
 #changelist-filter h2 {
     padding: 12px 16px;
-    background: #000000;
-    color: #ffffff;
+    background: #ffed00;
+    color: #000000;
     font-size: 14px;
+    font-weight: 700;
     letter-spacing: -.01em;
 }
 

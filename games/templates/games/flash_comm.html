@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}전략게임: 순간 통신{% endblock %}
+{% block extra_head %}
+<script src="https://unpkg.com/jspsych@7.3.4"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
+<link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+<style>
+  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
+  .jspsych-btn {
+    font-family: var(--font-body);
+    background: var(--color-volt-violet);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-buttons);
+  }
+  .rsvp-item { width: 60px; height: 60px; margin: 0 auto; }
+  .rsvp-item.filler { background: #c0c5cc; border-radius: 6px; }
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width: 640px; margin: 40px auto 0;">
+  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
+    <h1 style="font-size: 24px;">전략게임 · 순간 통신 (8/9)</h1>
+    <p>{{ candidate_name }}님, 회색 신호가 빠르게 연속으로 지나갑니다. 그 사이에 색깔 있는 원(첫 번째 신호)과 검은 도형(두 번째 신호)이 섞여 나옵니다. 각 신호가 끝나면 무엇을 보았는지 물어봅니다.</p>
+    <button id="startBtn" class="btn btn-primary">게임 시작</button>
+  </div>
+  <div id="jspsych-target" style="display: none;"></div>
+  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+    <h2>완료</h2>
+    <p>결과가 저장되었습니다. 감사합니다.</p>
+    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const submitUrl = '{% url "games:submit_result" slug %}';
+const alreadyDone = {{ already_done|yesno:"true,false" }};
+
+if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
+  document.getElementById('startGate').style.display = 'none';
+  document.getElementById('jspsych-target').style.display = 'block';
+
+  function mean(values) {
+    return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
+  }
+
+  const jsPsych = initJsPsych({
+    display_element: 'jspsych-target',
+    on_finish: function () {
+      const q1s = jsPsych.data.get().filterCustom(function (t) { return t.trial_stage === 't1_question'; }).values();
+      const q2s = jsPsych.data.get().filterCustom(function (t) { return t.trial_stage === 't2_question'; }).values();
+
+      const bySeq = {};
+      q1s.forEach(function (t) { bySeq[t.seq] = bySeq[t.seq] || {}; bySeq[t.seq].lag = t.lag; bySeq[t.seq].t1_correct = t.correct; });
+      q2s.forEach(function (t) { bySeq[t.seq] = bySeq[t.seq] || {}; bySeq[t.seq].lag = t.lag; bySeq[t.seq].t2_correct = t.correct; });
+      const seqResults = Object.keys(bySeq).map(function (k) { return bySeq[k]; });
+
+      const t1Accuracy = mean(seqResults.map(function (r) { return r.t1_correct ? 1 : 0; }));
+      const t2Accuracy = mean(seqResults.map(function (r) { return r.t2_correct ? 1 : 0; }));
+      const t2GivenT1 = seqResults.filter(function (r) { return r.t1_correct; });
+      const t2GivenT1Accuracy = t2GivenT1.length ? mean(t2GivenT1.map(function (r) { return r.t2_correct ? 1 : 0; })) : null;
+
+      // AB curve: T2 accuracy conditional on correct T1 report, by lag
+      const accByLag = {};
+      t2GivenT1.forEach(function (r) {
+        const key = String(r.lag);
+        (accByLag[key] = accByLag[key] || []).push(r.t2_correct ? 1 : 0);
+      });
+      const accuracyByLag = {};
+      Object.keys(accByLag).forEach(function (k) { accuracyByLag[k] = mean(accByLag[k]); });
+      let recoveryLag = null;
+      Object.keys(accuracyByLag).sort(function (a, b) { return Number(a) - Number(b); }).forEach(function (k) {
+        if (recoveryLag === null && accuracyByLag[k] >= 0.75) recoveryLag = Number(k);
+      });
+
+      const summary = {
+        n_sequences: seqResults.length,
+        t1_accuracy: t1Accuracy,
+        t2_accuracy: t2Accuracy,
+        t2_given_t1_accuracy: t2GivenT1Accuracy,
+        accuracy_by_lag: accuracyByLag,
+        attentional_blink_recovery_lag: recoveryLag,
+      };
+
+      fetch(submitUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ trials: seqResults, summary: summary }),
+      }).then(function (r) {
+        if (!r.ok && r.status !== 409) throw new Error('save failed');
+        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('thanksMsg').style.display = 'block';
+      }).catch(function () {
+        alert('저장에 실패했습니다. 다시 시도해주세요.');
+      });
+    },
+  });
+
+  // ponytail: fixed 3-stage rate ramp (140/110/90ms) rather than reactive
+  // per-sequence adaptation. RSVP has to be a fully pre-built jsPsych timeline
+  // (frames chain synchronously) so there's no clean point to react to
+  // accuracy mid-stream the way the other games do with dynamic parameters.
+  const N_SEQUENCES = 40;
+  const LAG_LEVELS = [1, 2, 3, 5, 8];
+  const TRAILING_FILLERS = 3;
+
+  const timeline = [];
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: '<p>회색 신호가 빠르게 지나가는 중 색깔 원과 검은 도형이 섞여 나옵니다.<br>각 회차가 끝나면 두 가지를 물어봅니다.</p><p>준비되면 스페이스바를 누르세요.</p>',
+    choices: "ALL_KEYS",
+  });
+
+  function fillerFrame(rate) {
+    return { type: jsPsychHtmlKeyboardResponse, stimulus: '<div class="rsvp-item filler"></div>', choices: 'NO_KEYS', trial_duration: rate };
+  }
+
+  for (let seqIdx = 0; seqIdx < N_SEQUENCES; seqIdx++) {
+    const lag = LAG_LEVELS[seqIdx % LAG_LEVELS.length];
+    const rate = seqIdx < 10 ? 140 : (seqIdx < 25 ? 110 : 90);
+    const leadIn = 4 + Math.floor(Math.random() * 3);
+    const t1IsBlue = Math.random() < 0.5;
+    const t1Color = t1IsBlue ? '#2f6fed' : '#f5a623';
+    const t2IsCircle = Math.random() < 0.5;
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: '<div class="rsvp-item filler" style="background:#8b93a1;"></div>',
+      choices: 'NO_KEYS',
+      trial_duration: 600,
+    });
+
+    for (let f = 0; f < leadIn; f++) timeline.push(fillerFrame(rate));
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: '<div class="rsvp-item" style="background:' + t1Color + ';border-radius:50%;"></div>',
+      choices: 'NO_KEYS',
+      trial_duration: rate,
+    });
+
+    for (let g = 0; g < lag - 1; g++) timeline.push(fillerFrame(rate));
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: '<div class="rsvp-item" style="background:#111111;' + (t2IsCircle ? 'border-radius:50%;' : 'border-radius:4px;') + '"></div>',
+      choices: 'NO_KEYS',
+      trial_duration: rate,
+    });
+
+    for (let t = 0; t < TRAILING_FILLERS; t++) timeline.push(fillerFrame(rate));
+
+    const correctQ1Index = t1IsBlue ? 0 : 1;
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: '<p>방금 첫 번째 신호(원)는 무슨 색이었나요?</p>',
+      choices: ['파란색', '주황색'],
+      data: { trial_stage: 't1_question', seq: seqIdx, lag: lag },
+      on_finish: function (data) { data.correct = Number(data.response) === correctQ1Index; },
+    });
+
+    const correctQ2Index = t2IsCircle ? 0 : 1;
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: '<p>두 번째 신호(검은 도형)는 어떤 모양이었나요?</p>',
+      choices: ['원', '네모'],
+      data: { trial_stage: 't2_question', seq: seqIdx, lag: lag },
+      on_finish: function (data) { data.correct = Number(data.response) === correctQ2Index; },
+    });
+  }
+
+  jsPsych.run(timeline);
+});
+</script>
+{% endblock %}

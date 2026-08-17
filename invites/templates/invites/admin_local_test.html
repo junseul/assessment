@@ -1,0 +1,14 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block coltype %}colM{% endblock %}
+{% block bodyclass %}{{ block.super }} local-test{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block content_title %}<h1>{{ title }}</h1>{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <iframe src="{{ iframe_src }}" title="{{ title }}"
+    style="width: 100%; height: calc(100vh - 220px); min-height: 560px; border: 1px solid var(--border-color, #ccc); border-radius: 6px; background: #fff;"></iframe>
+</div>
+{% endblock %}

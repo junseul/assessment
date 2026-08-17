@@ -26,6 +26,12 @@ class SurveySubmitTests(TestCase):
         self.assertContains(response, 'remaining / currentLimitMs * 100')
         self.assertNotContains(response, 'const schema = {')
 
+    def test_page_is_frameable_from_same_origin(self):
+        # Admin's local-test iframe (invites.views.local_test) embeds this
+        # page; Django's default X-Frame-Options: DENY would silently block it.
+        response = self.client.get(reverse('traits:survey_detail', args=[self.survey.pk]))
+        self.assertEqual(response.headers.get('X-Frame-Options'), 'SAMEORIGIN')
+
     def test_submit_ok(self):
         response = self.client.post(
             self.url,

@@ -5,6 +5,8 @@ from . import views
 app_name = 'games'
 
 urlpatterns = [
-    path('games/go-nogo/', views.go_nogo, name='go_nogo'),
-    path('games/go-nogo/submit/', views.submit_result, name='submit_result'),
+    path('games/', views.index, name='index'),
+    path('games/admin/grid/', views.admin_grid, name='admin_grid'),
+    path('games/<slug:slug>/', views.play, name='play'),
+    path('games/<slug:slug>/submit/', views.submit_result, name='submit_result'),
 ]

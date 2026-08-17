@@ -76,6 +76,14 @@ a:hover { text-decoration-thickness: 2px; }
   font-weight: 600;
   font-size: 18px;
   color: var(--color-graphite-heading);
+  text-decoration: none;
+}
+
+.brand-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  vertical-align: middle;
 }
 .navbar .brand .dot { color: #000000; }
 .navbar .nav-right {

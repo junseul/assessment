@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
 from invites.decorators import candidate_required
@@ -61,6 +62,7 @@ def _is_allowed_video(uploaded):
 
 
 @candidate_required
+@xframe_options_sameorigin
 def interview_detail(request):
     existing = None if request.session.get('local_test_mode') else (
         InterviewResponse.objects

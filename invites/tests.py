@@ -80,15 +80,34 @@ class LocalTestTests(TestCase):
         self.candidate = make_candidate()
         self.client.force_login(self.admin)
 
-    def test_game_link_sets_candidate_session(self):
+    def test_game_link_renders_admin_grid_iframe_with_sidebar(self):
         response = self.client.get(reverse('invites:local_test', args=['games']))
-        self.assertRedirects(response, reverse('games:go_nogo'), fetch_redirect_response=False)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="nav-sidebar"')
+        self.assertContains(response, reverse('games:admin_grid'))
         self.assertEqual(self.client.session['candidate_id'], self.candidate.pk)
+
+    def test_traits_and_interviews_links_also_render_admin_iframe(self):
+        response = self.client.get(reverse('invites:local_test', args=['interviews']))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="nav-sidebar"')
+        self.assertContains(response, reverse('interviews:interview_detail'))
+
+    def test_admin_grid_lists_all_nine_games_as_playable(self):
+        self.client.get(reverse('invites:local_test', args=['games']))
+        response = self.client.get(reverse('games:admin_grid'))
+        self.assertEqual(response.status_code, 200)
+        for title in ['레이더 관제', '긴급 제동', '탐사대 투자']:
+            self.assertContains(response, title)
+        self.assertContains(response, reverse('games:play', args=['radar-control']))
+        # Django's default X-Frame-Options: DENY would silently block this
+        # page inside the admin_local_test.html iframe.
+        self.assertEqual(response.headers.get('X-Frame-Options'), 'SAMEORIGIN')
 
     def test_local_game_submission_does_not_write_result(self):
         self.client.get(reverse('invites:local_test', args=['games']))
         response = self.client.post(
-            reverse('games:submit_result'),
+            reverse('games:submit_result', args=['radar-control']),
             data=json.dumps({'trials': [], 'summary': {}}),
             content_type='application/json',
         )

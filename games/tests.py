@@ -286,3 +286,53 @@ class ExpeditionInvestmentTests(TestCase):
         response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         self.assertTrue(GameResult.objects.filter(candidate=self.candidate, game_slug=self.slug).exists())
+
+    def test_deck_payoffs_not_exposed_in_page_source(self):
+        # The payoff table used to be inlined as JS literals (decks = {A: {winAmt: ...}}),
+        # letting anyone read exact win/loss odds from devtools instead of playing under
+        # genuine uncertainty. It must now live server-side only (see games.views.EXPEDITION_BASE_DECKS).
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertNotContains(response, 'winAmt')
+        self.assertNotContains(response, 'lossProb')
+        self.assertNotContains(response, 'lossAmt')
+
+    def test_round_endpoint_resolves_choice(self):
+        response = self.client.post(
+            reverse('games:expedition_round'),
+            data=json.dumps({'deck': 'A'}), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body['deck'], 'A')
+        self.assertIn('amount', body)
+        self.assertIn(body['is_loss'], [True, False])
+        self.assertEqual(body['trial_index'], 0)
+        self.assertEqual(body['phase'], 'pre')
+
+    def test_round_endpoint_rejects_invalid_deck(self):
+        response = self.client.post(
+            reverse('games:expedition_round'),
+            data=json.dumps({'deck': 'Z'}), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_round_endpoint_flips_to_post_phase_after_reversal_index(self):
+        round_url = reverse('games:expedition_round')
+        for _ in range(50):
+            self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
+        response = self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
+        self.assertEqual(response.json()['phase'], 'post')
+
+    def test_round_endpoint_blocks_after_100_rounds(self):
+        round_url = reverse('games:expedition_round')
+        for _ in range(100):
+            self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
+        response = self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_round_endpoint_requires_session(self):
+        response = Client().post(
+            reverse('games:expedition_round'),
+            data=json.dumps({'deck': 'A'}), content_type='application/json',
+        )
+        self.assertRedirects(response, reverse('invites:no_access'), target_status_code=403)

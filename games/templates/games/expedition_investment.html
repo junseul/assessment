@@ -35,6 +35,7 @@
 <script>
 const csrfToken = '{{ csrf_token }}';
 const submitUrl = '{% url "games:submit_result" slug %}';
+const roundUrl = '{% url "games:expedition_round" %}';
 const alreadyDone = {{ already_done|yesno:"true,false" }};
 
 if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
@@ -54,20 +55,17 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   }
 
   const N_TRIALS = 100;
-  const REVERSAL_INDEX = 50; // 0-indexed: trials [0,50) use the base payoff table, [50,100) use it flipped
+  const REVERSAL_INDEX = 50; // for client-side analysis only; the server enforces the real reversal point
 
-  // Classic IGT-style structure: A/B look tempting (bigger single win) but are
-  // net-negative; C/D look modest but are net-positive. At the reversal, the
-  // whole payoff table flips onto the same A-D labels.
-  let decks = {
-    A: { winAmt: 100, lossProb: 0.5, lossAmt: 250 },
-    B: { winAmt: 100, lossProb: 0.1, lossAmt: 1250 },
-    C: { winAmt: 50, lossProb: 0.5, lossAmt: 25 },
-    D: { winAmt: 50, lossProb: 0.1, lossAmt: 125 },
-  };
-  function applyReversal() {
-    const a = decks.A, b = decks.B;
-    decks.A = decks.C; decks.B = decks.D; decks.C = a; decks.D = b;
+  function resolveDeck(deckLetter) {
+    return fetch(roundUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+      body: JSON.stringify({ deck: deckLetter }),
+    }).then(function (r) {
+      if (!r.ok) throw new Error('round failed');
+      return r.json();
+    });
   }
 
   let runningTotal = 0;
@@ -164,38 +162,10 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     },
   });
 
-  const timeline = [];
-  timeline.push({
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: '<p>A, B, C, D 네 지역 중 하나를 반복해서 선택하며 자원을 최대한 모으세요.<br>확률은 알려드리지 않습니다.</p><p>준비되면 스페이스바를 누르세요.</p>',
-    choices: "ALL_KEYS",
-  });
-
   const DECK_LETTERS = ['A', 'B', 'C', 'D'];
-  for (let i = 0; i < N_TRIALS; i++) {
-    timeline.push({
-      type: jsPsychHtmlButtonResponse,
-      stimulus: function () { return '<p>누적 자원: ' + runningTotal + '</p><p>탐사할 지역을 선택하세요.</p>'; },
-      choices: ['A 지역', 'B 지역', 'C 지역', 'D 지역'],
-      data: { trial_stage: 'choice', trial_index: i },
-      on_finish: function (data) {
-        if (data.trial_index === REVERSAL_INDEX) applyReversal();
-        const deckLetter = DECK_LETTERS[Number(data.response)];
-        const deck = decks[deckLetter];
-        const isLoss = Math.random() < deck.lossProb;
-        const amount = deck.winAmt - (isLoss ? deck.lossAmt : 0);
-        runningTotal += amount;
-        lastOutcome = { deck: deckLetter, amount: amount };
 
-        data.deck = deckLetter;
-        data.amount = amount;
-        data.is_loss = amount < 0;
-        data.running_total = runningTotal;
-        data.phase = data.trial_index < REVERSAL_INDEX ? 'pre' : 'post';
-      },
-    });
-
-    timeline.push({
+  function feedbackTrial() {
+    return {
       type: jsPsychHtmlKeyboardResponse,
       stimulus: function () {
         const color = lastOutcome.amount >= 0 ? '#22a06b' : '#e5484d';
@@ -205,8 +175,47 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
       },
       choices: 'NO_KEYS',
       trial_duration: 1200,
-    });
+    };
   }
+
+  // Each round is resolved by the server (see resolveDeck) so the payoff table
+  // and reversal point are never sent to the browser. Trials are appended one
+  // at a time via addNodeToEndOfTimeline once each round's result is back.
+  function choiceTrial(i) {
+    return {
+      type: jsPsychHtmlButtonResponse,
+      stimulus: function () { return '<p>누적 자원: ' + runningTotal + '</p><p>탐사할 지역을 선택하세요.</p>'; },
+      choices: ['A 지역', 'B 지역', 'C 지역', 'D 지역'],
+      data: { trial_stage: 'choice', trial_index: i },
+      on_finish: function (data) {
+        const deckLetter = DECK_LETTERS[Number(data.response)];
+        resolveDeck(deckLetter).then(function (result) {
+          runningTotal = result.running_total;
+          lastOutcome = { deck: result.deck, amount: result.amount };
+
+          data.deck = result.deck;
+          data.amount = result.amount;
+          data.is_loss = result.is_loss;
+          data.running_total = result.running_total;
+          data.phase = result.phase;
+
+          const nextNodes = [feedbackTrial()];
+          if (i + 1 < N_TRIALS) nextNodes.push(choiceTrial(i + 1));
+          jsPsych.addNodeToEndOfTimeline({ timeline: nextNodes });
+        }).catch(function () {
+          alert('통신 오류로 게임을 진행할 수 없습니다. 새로고침 후 다시 시도해주세요.');
+        });
+      },
+    };
+  }
+
+  const timeline = [];
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: '<p>A, B, C, D 네 지역 중 하나를 반복해서 선택하며 자원을 최대한 모으세요.<br>확률은 알려드리지 않습니다.</p><p>준비되면 스페이스바를 누르세요.</p>',
+    choices: "ALL_KEYS",
+  });
+  timeline.push(choiceTrial(0));
 
   jsPsych.run(timeline);
 });

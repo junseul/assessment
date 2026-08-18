@@ -136,6 +136,26 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
       const reversalAdaptation = (preReversalSwitchRate !== null && postReversalSwitchRate !== null)
         ? postReversalSwitchRate - preReversalSwitchRate : null;
 
+      // Risk-attitude proxies. Neither needs the (hidden) payoff table: both
+      // are derived purely from each trial's realized amount, so they stay
+      // valid even though the candidate never sees deck probabilities.
+      const amounts = choiceTrials.map(function (t) { return t.amount; });
+      const meanAmount = mean(amounts);
+      const outcomeVariance = amounts.length
+        ? amounts.reduce(function (acc, a) { return acc + Math.pow(a - meanAmount, 2); }, 0) / amounts.length
+        : null;
+
+      let postLossAbsSum = 0, postLossCount = 0;
+      for (let i = 1; i < choiceTrials.length; i++) {
+        if (choiceTrials[i - 1].is_loss) { postLossAbsSum += Math.abs(choiceTrials[i].amount); postLossCount++; }
+      }
+      const postLossAvgAbsAmount = postLossCount ? postLossAbsSum / postLossCount : null;
+      const overallAvgAbsAmount = amounts.length ? mean(amounts.map(Math.abs)) : null;
+      // Positive: swings get bigger right after a loss (loss chasing).
+      // Negative: the candidate plays it safer right after a loss.
+      const lossChasingIndex = (postLossAvgAbsAmount !== null && overallAvgAbsAmount !== null)
+        ? postLossAvgAbsAmount - overallAvgAbsAmount : null;
+
       const summary = {
         n_trials: choiceTrials.length,
         final_total: runningTotal,
@@ -146,6 +166,8 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
         learning_rate: learningRate,
         loss_stay_rate: lossStayRate,
         reversal_adaptation: reversalAdaptation,
+        outcome_variance: outcomeVariance,
+        loss_chasing_index: lossChasingIndex,
       };
 
       fetch(submitUrl, {

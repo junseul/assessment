@@ -282,6 +282,11 @@ class ExpeditionInvestmentTests(TestCase):
         self.assertContains(response, "'A 지역', 'B 지역', 'C 지역', 'D 지역'")
         self.assertContains(response, 'REVERSAL_INDEX')
 
+    def test_game_computes_risk_attitude_metrics(self):
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, 'outcome_variance')
+        self.assertContains(response, 'loss_chasing_index')
+
     def test_submit_ok(self):
         response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
         self.assertEqual(response.status_code, 200)

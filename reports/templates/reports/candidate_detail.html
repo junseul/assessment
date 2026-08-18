@@ -16,7 +16,7 @@
     {% for r in survey_responses %}
       <div class="card">
         <p class="meta">{{ r.survey.title }} · {{ r.created_at }}</p>
-        <p><strong>종합 환산점수:</strong> {{ r.score|default:"-" }} / 100 · {{ r.interpretation }}</p>
+        <p><strong>종합 환산점수:</strong> {{ r.score|default_if_none:"-" }} / 100 · {{ r.interpretation }}</p>
         {% if r.score is not None %}
           <dl class="report-dl">
             {% for domain in r.domain_scores %}
@@ -24,9 +24,9 @@
             {% endfor %}
           </dl>
           <dl class="report-dl">
-            <dt>극단응답 비율</dt><dd>{{ r.quality.extreme_response_rate|default:"-" }}</dd>
-            <dt>속응답 비율(1.5초 미만)</dt><dd>{{ r.quality.fast_response_rate|default:"-" }}</dd>
-            <dt>동일응답 최대 연속</dt><dd>{{ r.quality.max_same_answer_streak|default:"-" }}</dd>
+            <dt>극단응답 비율</dt><dd>{{ r.quality.extreme_response_rate|default_if_none:"-" }}</dd>
+            <dt>속응답 비율(1.5초 미만)</dt><dd>{{ r.quality.fast_response_rate|default_if_none:"-" }}</dd>
+            <dt>동일응답 최대 연속</dt><dd>{{ r.quality.max_same_answer_streak|default_if_none:"-" }}</dd>
           </dl>
         {% endif %}
         {% if r.score is None %}
@@ -49,14 +49,14 @@
         <p class="meta"><span class="badge">{{ g.game_slug }}</span> · {{ g.created_at }}</p>
         {% if g.is_expedition_investment %}
           <dl class="report-dl">
-            <dt>최종 자원</dt><dd>{{ g.summary.final_total|default:"-" }}</dd>
-            <dt>시행 수</dt><dd>{{ g.summary.n_trials|default:"-" }}</dd>
-            <dt>탐색 비율</dt><dd>{{ g.summary.exploration_rate|default:"-" }}</dd>
-            <dt>학습 기울기</dt><dd>{{ g.summary.learning_rate|default:"-" }}</dd>
-            <dt>손실 후 동일선택 비율</dt><dd>{{ g.summary.loss_stay_rate|default:"-" }}</dd>
-            <dt>반전 적응도</dt><dd>{{ g.summary.reversal_adaptation|default:"-" }}</dd>
-            <dt>결과 변동성(위험선호)</dt><dd>{{ g.summary.outcome_variance|default:"-" }}</dd>
-            <dt>손실추격 지수</dt><dd>{{ g.summary.loss_chasing_index|default:"-" }}</dd>
+            <dt>최종 자원</dt><dd>{{ g.summary.final_total|default_if_none:"-" }}</dd>
+            <dt>시행 수</dt><dd>{{ g.summary.n_trials|default_if_none:"-" }}</dd>
+            <dt>탐색 비율</dt><dd>{{ g.summary.exploration_rate|default_if_none:"-" }}</dd>
+            <dt>학습 기울기</dt><dd>{{ g.summary.learning_rate|default_if_none:"-" }}</dd>
+            <dt>손실 후 동일선택 비율</dt><dd>{{ g.summary.loss_stay_rate|default_if_none:"-" }}</dd>
+            <dt>반전 적응도</dt><dd>{{ g.summary.reversal_adaptation|default_if_none:"-" }}</dd>
+            <dt>결과 변동성(위험선호)</dt><dd>{{ g.summary.outcome_variance|default_if_none:"-" }}</dd>
+            <dt>손실추격 지수</dt><dd>{{ g.summary.loss_chasing_index|default_if_none:"-" }}</dd>
           </dl>
         {% else %}
           <dl class="report-dl">

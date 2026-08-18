@@ -117,6 +117,33 @@ class ReportTests(TestCase):
         # setUp's plain go-nogo result must still use the generic accuracy block.
         self.assertContains(response, '정확한 반응 억제')
 
+    def test_zero_valued_metrics_render_as_zero_not_dash(self):
+        # Django's `default` filter treats 0/0.0 as falsy and substitutes the
+        # fallback, which would misreport a real "no exploration at all" or
+        # "no loss chasing" result as missing data. Must use default_if_none.
+        GameResult.objects.create(
+            candidate=self.candidate,
+            game_slug='expedition-investment',
+            respondent_email=self.candidate.email,
+            trials=[],
+            summary={'final_total': 0, 'exploration_rate': 0.0, 'loss_chasing_index': 0.0},
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        self.assertContains(response, '<dt>최종 자원</dt><dd>0</dd>', html=True)
+        self.assertContains(response, '<dt>탐색 비율</dt><dd>0.0</dd>', html=True)
+        self.assertContains(response, '<dt>손실추격 지수</dt><dd>0.0</dd>', html=True)
+
+    def test_zero_survey_score_renders_as_zero_not_dash(self):
+        survey = Survey.objects.create(title='역량 설문', schema={})
+        SurveyResponse.objects.create(
+            candidate=self.candidate, survey=survey, respondent_email=self.candidate.email,
+            answers={'q001': 1},
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        self.assertContains(response, '0.0 / 100')
+
     def test_logout_rejects_get(self):
         self.client.login(username='hr', password='pass')
         response = self.client.get(reverse('logout'))

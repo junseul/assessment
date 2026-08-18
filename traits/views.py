@@ -34,7 +34,7 @@ def submit_response(request, pk):
     except json.JSONDecodeError:
         return HttpResponseBadRequest('invalid json')
 
-    answers = payload.get('answers')
+    answers = payload.get('answers') if isinstance(payload, dict) else None
     if not isinstance(answers, dict):
         return HttpResponseBadRequest('answers is required')
     expected = {f'q{number:03d}' for number in range(1, len(QUESTION_TEXT) + 1)}

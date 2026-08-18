@@ -45,6 +45,12 @@ class GameSubmitTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_non_object_json_body_rejected_not_500(self):
+        response = self.client.post(
+            self.url, data=json.dumps(['not', 'an', 'object']), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
     def test_unknown_slug_404s_on_play(self):
         response = self.client.get(reverse('games:play', args=['not-a-real-game']))
         self.assertEqual(response.status_code, 404)
@@ -320,6 +326,27 @@ class ExpeditionInvestmentTests(TestCase):
             data=json.dumps({'deck': 'Z'}), content_type='application/json',
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_round_endpoint_rejects_non_object_json_body(self):
+        response = self.client.post(
+            reverse('games:expedition_round'),
+            data=json.dumps(['A']), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_reloading_play_page_resets_round_progress(self):
+        round_url = reverse('games:expedition_round')
+        for _ in range(10):
+            self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
+        # Simulates a mid-game refresh: GET-ing the play page again (not yet
+        # submitted) must put the server-side round counter back to 0, or the
+        # client's freshly-restarted trial 0 would silently resolve against
+        # whatever trial the server thinks it's on (e.g. already past the
+        # reversal), corrupting the phase/is_loss the client records.
+        self.client.get(reverse('games:play', args=[self.slug]))
+        response = self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
+        self.assertEqual(response.json()['trial_index'], 0)
+        self.assertEqual(response.json()['phase'], 'pre')
 
     def test_round_endpoint_flips_to_post_phase_after_reversal_index(self):
         round_url = reverse('games:expedition_round')

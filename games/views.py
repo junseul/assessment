@@ -80,8 +80,8 @@ def submit_result(request, slug):
     except json.JSONDecodeError:
         return HttpResponseBadRequest('invalid json')
 
-    trials = payload.get('trials')
-    summary = payload.get('summary')
+    trials = payload.get('trials') if isinstance(payload, dict) else None
+    summary = payload.get('summary') if isinstance(payload, dict) else None
     if not isinstance(trials, list) or not isinstance(summary, dict):
         return HttpResponseBadRequest('trials and summary are required')
 
@@ -110,6 +110,8 @@ def expedition_round(request):
         payload = json.loads(request.body)
     except json.JSONDecodeError:
         return HttpResponseBadRequest('invalid json')
+    if not isinstance(payload, dict):
+        return HttpResponseBadRequest('invalid payload')
 
     deck_choice = payload.get('deck')
     if deck_choice not in EXPEDITION_BASE_DECKS:

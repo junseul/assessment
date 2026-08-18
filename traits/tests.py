@@ -70,6 +70,12 @@ class SurveySubmitTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_non_object_json_body_rejected_not_500(self):
+        response = self.client.post(
+            self.url, data=json.dumps(['not', 'an', 'object']), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
     def test_timed_out_answer_with_null_value_accepted(self):
         answers = dict(self.answers)
         answers['q001'] = {'value': None, 'rt_ms': 8000, 'timed_out': True, 'seq': 0}

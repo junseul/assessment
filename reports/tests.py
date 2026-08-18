@@ -101,6 +101,22 @@ class ReportTests(TestCase):
         self.assertContains(response, '강점 수준')
         self.assertContains(response, '정확한 반응 억제')
 
+    def test_expedition_investment_shows_its_own_metrics_other_games_unaffected(self):
+        GameResult.objects.create(
+            candidate=self.candidate,
+            game_slug='expedition-investment',
+            respondent_email=self.candidate.email,
+            trials=[],
+            summary={'final_total': 250, 'exploration_rate': 0.3, 'outcome_variance': 4200.5},
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        self.assertContains(response, '최종 자원')
+        self.assertContains(response, '결과 변동성(위험선호)')
+        self.assertContains(response, '4200.5')
+        # setUp's plain go-nogo result must still use the generic accuracy block.
+        self.assertContains(response, '정확한 반응 억제')
+
     def test_logout_rejects_get(self):
         self.client.login(username='hr', password='pass')
         response = self.client.get(reverse('logout'))

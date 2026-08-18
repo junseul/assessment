@@ -5,7 +5,7 @@ from games.models import GameResult
 from interviews.models import InterviewResponse
 from invites.models import Candidate
 from traits.models import SurveyResponse
-from traits.survey_definition import score_answers
+from traits.survey_definition import response_quality, score_answers
 
 
 @login_required
@@ -30,6 +30,7 @@ def candidate_detail(request, pk):
             else '개발 필요' if response.score is not None
             else '점수 문항 없음'
         )
+        response.quality = response_quality(response.answers)
     game_results = list(GameResult.objects.filter(candidate=candidate).order_by('-created_at'))
     for result in game_results:
         accuracy = result.summary.get('accuracy')
@@ -39,6 +40,14 @@ def candidate_detail(request, pk):
             else '오반응 검토 필요' if isinstance(accuracy, (int, float))
             else '해석 불가'
         )
+        result.is_expedition_investment = result.game_slug == 'expedition-investment'
+        if result.is_expedition_investment:
+            exploration_rate = result.summary.get('exploration_rate')
+            result.interpretation = (
+                f'탐색 위주 ({round(exploration_rate * 100)}% 탐색)' if isinstance(exploration_rate, (int, float)) and exploration_rate >= .5
+                else f'활용 위주 ({round((1 - exploration_rate) * 100)}% 활용)' if isinstance(exploration_rate, (int, float))
+                else '해석 불가'
+            )
     interview_responses = list(InterviewResponse.objects.filter(candidate=candidate).order_by('-created_at'))
     interview_complete = bool(interview_responses) and (
         not interview_responses[0].follow_up_question

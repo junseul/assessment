@@ -20,8 +20,13 @@
         {% if r.score is not None %}
           <dl class="report-dl">
             {% for domain in r.domain_scores %}
-              <dt>{{ domain.label }}</dt><dd>{{ domain.score }}점 ({{ domain.answered }}문항 응답)</dd>
+              <dt>{{ domain.label }}</dt><dd>{{ domain.score }}점 ({{ domain.answered }}문항 응답, 타임아웃 {{ domain.timed_out }}건)</dd>
             {% endfor %}
+          </dl>
+          <dl class="report-dl">
+            <dt>극단응답 비율</dt><dd>{{ r.quality.extreme_response_rate|default:"-" }}</dd>
+            <dt>속응답 비율(1.5초 미만)</dt><dd>{{ r.quality.fast_response_rate|default:"-" }}</dd>
+            <dt>동일응답 최대 연속</dt><dd>{{ r.quality.max_same_answer_streak|default:"-" }}</dd>
           </dl>
         {% endif %}
         {% if r.score is None %}
@@ -42,11 +47,24 @@
     {% for g in game_results %}
       <div class="card">
         <p class="meta"><span class="badge">{{ g.game_slug }}</span> · {{ g.created_at }}</p>
-        <dl class="report-dl">
-          <dt>정확도</dt><dd>{{ g.summary.accuracy }}</dd>
-          <dt>평균 반응시간(ms)</dt><dd>{{ g.summary.avg_rt_ms }}</dd>
-          <dt>시행 수</dt><dd>{{ g.summary.n_trials }}</dd>
-        </dl>
+        {% if g.is_expedition_investment %}
+          <dl class="report-dl">
+            <dt>최종 자원</dt><dd>{{ g.summary.final_total|default:"-" }}</dd>
+            <dt>시행 수</dt><dd>{{ g.summary.n_trials|default:"-" }}</dd>
+            <dt>탐색 비율</dt><dd>{{ g.summary.exploration_rate|default:"-" }}</dd>
+            <dt>학습 기울기</dt><dd>{{ g.summary.learning_rate|default:"-" }}</dd>
+            <dt>손실 후 동일선택 비율</dt><dd>{{ g.summary.loss_stay_rate|default:"-" }}</dd>
+            <dt>반전 적응도</dt><dd>{{ g.summary.reversal_adaptation|default:"-" }}</dd>
+            <dt>결과 변동성(위험선호)</dt><dd>{{ g.summary.outcome_variance|default:"-" }}</dd>
+            <dt>손실추격 지수</dt><dd>{{ g.summary.loss_chasing_index|default:"-" }}</dd>
+          </dl>
+        {% else %}
+          <dl class="report-dl">
+            <dt>정확도</dt><dd>{{ g.summary.accuracy }}</dd>
+            <dt>평균 반응시간(ms)</dt><dd>{{ g.summary.avg_rt_ms }}</dd>
+            <dt>시행 수</dt><dd>{{ g.summary.n_trials }}</dd>
+          </dl>
+        {% endif %}
         <p><strong>해석:</strong> {{ g.interpretation }}</p>
       </div>
     {% empty %}

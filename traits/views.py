@@ -38,10 +38,18 @@ def submit_response(request, pk):
     if not isinstance(answers, dict):
         return HttpResponseBadRequest('answers is required')
     expected = {f'q{number:03d}' for number in range(1, len(QUESTION_TEXT) + 1)}
-    if set(answers) != expected or any(
-        value is not None and (not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 5)
-        for value in answers.values()
-    ):
+
+    def is_valid_entry(entry):
+        if not isinstance(entry, dict) or set(entry) != {'value', 'rt_ms', 'timed_out'}:
+            return False
+        value = entry['value']
+        value_ok = value is None or (isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 5)
+        rt_ms = entry['rt_ms']
+        rt_ok = isinstance(rt_ms, int) and not isinstance(rt_ms, bool) and rt_ms >= 0
+        timed_out_ok = isinstance(entry['timed_out'], bool) and entry['timed_out'] == (value is None)
+        return value_ok and rt_ok and timed_out_ok
+
+    if set(answers) != expected or any(not is_valid_entry(entry) for entry in answers.values()):
         return HttpResponseBadRequest('invalid answers')
 
     if request.session.get('local_test_mode'):

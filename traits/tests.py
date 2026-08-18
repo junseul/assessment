@@ -17,7 +17,10 @@ class SurveySubmitTests(TestCase):
             schema={'title': '성향파악', 'pages': []},
         )
         self.url = reverse('traits:submit_response', args=[self.survey.pk])
-        self.answers = {f'q{number:03d}': 3 for number in range(1, 171)}
+        self.answers = {
+            f'q{number:03d}': {'value': 3, 'rt_ms': 2000, 'timed_out': False}
+            for number in range(1, 171)
+        }
 
     def test_page_uses_json_script(self):
         response = self.client.get(reverse('traits:survey_detail', args=[self.survey.pk]))
@@ -67,10 +70,50 @@ class SurveySubmitTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_timed_out_answer_with_null_value_accepted(self):
+        answers = dict(self.answers)
+        answers['q001'] = {'value': None, 'rt_ms': 8000, 'timed_out': True}
+        response = self.client.post(
+            self.url, data=json.dumps({'answers': answers}), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_negative_rt_ms_rejected(self):
+        answers = dict(self.answers)
+        answers['q001'] = {'value': 3, 'rt_ms': -1, 'timed_out': False}
+        response = self.client.post(
+            self.url, data=json.dumps({'answers': answers}), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_timed_out_flag_inconsistent_with_value_rejected(self):
+        answers = dict(self.answers)
+        answers['q001'] = {'value': 3, 'rt_ms': 2000, 'timed_out': True}
+        response = self.client.post(
+            self.url, data=json.dumps({'answers': answers}), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
 
 class SurveyScoringTests(TestCase):
     def test_reverse_item_is_scored_in_opposite_direction(self):
+        # Bare-number shape: how older SurveyResponse rows already stored in
+        # the DB looked before response-time tracking was added.
         domains = score_answers({'q007': 1})
         self.assertEqual(domains[0]['average'], 5)
         self.assertEqual(domains[0]['score'], 100)
+
+    def test_current_shape_scores_the_same_as_bare_number(self):
+        domains = score_answers({'q007': {'value': 1, 'rt_ms': 3000, 'timed_out': False}})
+        self.assertEqual(domains[0]['average'], 5)
+        self.assertEqual(domains[0]['score'], 100)
+
+    def test_timed_out_answers_are_counted_and_excluded_from_average(self):
+        domains = score_answers({
+            'q001': {'value': None, 'rt_ms': 8000, 'timed_out': True},
+            'q002': {'value': 4, 'rt_ms': 2000, 'timed_out': False},
+        })
+        self.assertEqual(domains[0]['timed_out'], 1)
+        self.assertEqual(domains[0]['answered'], 1)
+        self.assertEqual(domains[0]['average'], 4)
 

@@ -219,8 +219,15 @@ def score_answers(answers):
     scores = []
     for key, label, start, end in DOMAINS:
         values = []
+        timed_out = 0
         for number in range(start, end + 1):
-            value = answers.get(f'q{number:03d}')
+            entry = answers.get(f'q{number:03d}')
+            # Accept both the current {value, rt_ms, timed_out} shape and the
+            # older bare-number shape, so previously stored SurveyResponses
+            # still score correctly.
+            value = entry.get('value') if isinstance(entry, dict) else entry
+            if isinstance(entry, dict) and entry.get('timed_out'):
+                timed_out += 1
             if isinstance(value, (int, float)) and 1 <= value <= 5:
                 values.append(6 - value if number in REVERSED else value)
         average = sum(values) / len(values) if values else None
@@ -228,6 +235,7 @@ def score_answers(answers):
             'key': key,
             'label': label,
             'answered': len(values),
+            'timed_out': timed_out,
             'average': round(average, 2) if average is not None else None,
             'score': round((average - 1) / 4 * 100, 1) if average is not None else None,
         })

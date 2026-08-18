@@ -54,8 +54,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     return den === 0 ? null : num / den;
   }
 
-  const N_TRIALS = 100;
-  const REVERSAL_INDEX = 50; // for client-side analysis only; the server enforces the real reversal point
+  const REVERSAL_INDEX = 50; // for client-side analysis only; the server enforces the real reversal point and trial count
 
   function resolveDeck(deckLetter) {
     return fetch(roundUrl, {
@@ -222,7 +221,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
           data.phase = result.phase;
 
           const nextNodes = [feedbackTrial()];
-          if (i + 1 < N_TRIALS) nextNodes.push(choiceTrial(i + 1));
+          if (!result.done) nextNodes.push(choiceTrial(i + 1));
           jsPsych.addNodeToEndOfTimeline({ timeline: nextNodes });
         }).catch(function () {
           alert('통신 오류로 게임을 진행할 수 없습니다. 새로고침 후 다시 시도해주세요.');

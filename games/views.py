@@ -141,4 +141,5 @@ def expedition_round(request):
         'running_total': running_total,
         'trial_index': trial_index,
         'phase': 'post' if reversed_phase else 'pre',
+        'done': state['trial_index'] >= EXPEDITION_TRIALS,
     })

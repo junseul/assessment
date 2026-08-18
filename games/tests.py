@@ -293,6 +293,15 @@ class ExpeditionInvestmentTests(TestCase):
         self.assertContains(response, 'outcome_variance')
         self.assertContains(response, 'loss_chasing_index')
 
+    def test_client_relies_on_server_done_flag_not_a_hardcoded_trial_count(self):
+        # Trial count used to be duplicated as N_TRIALS on the client and
+        # EXPEDITION_TRIALS on the server; if they drifted apart the client
+        # would stop early or the 101st round request would 400. The client
+        # now just stops when the server says done.
+        response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertNotContains(response, 'N_TRIALS')
+        self.assertContains(response, 'result.done')
+
     def test_submit_ok(self):
         response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
         self.assertEqual(response.status_code, 200)
@@ -319,6 +328,15 @@ class ExpeditionInvestmentTests(TestCase):
         self.assertIn(body['is_loss'], [True, False])
         self.assertEqual(body['trial_index'], 0)
         self.assertEqual(body['phase'], 'pre')
+        self.assertFalse(body['done'])
+
+    def test_round_endpoint_marks_done_on_last_round(self):
+        round_url = reverse('games:expedition_round')
+        for _ in range(99):
+            response = self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
+            self.assertFalse(response.json()['done'])
+        response = self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
+        self.assertTrue(response.json()['done'])
 
     def test_round_endpoint_rejects_invalid_deck(self):
         response = self.client.post(

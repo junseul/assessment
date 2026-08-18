@@ -40,16 +40,20 @@ def submit_response(request, pk):
     expected = {f'q{number:03d}' for number in range(1, len(QUESTION_TEXT) + 1)}
 
     def is_valid_entry(entry):
-        if not isinstance(entry, dict) or set(entry) != {'value', 'rt_ms', 'timed_out'}:
+        if not isinstance(entry, dict) or set(entry) != {'value', 'rt_ms', 'timed_out', 'seq'}:
             return False
         value = entry['value']
         value_ok = value is None or (isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 5)
         rt_ms = entry['rt_ms']
         rt_ok = isinstance(rt_ms, int) and not isinstance(rt_ms, bool) and rt_ms >= 0
         timed_out_ok = isinstance(entry['timed_out'], bool) and entry['timed_out'] == (value is None)
-        return value_ok and rt_ok and timed_out_ok
+        seq = entry['seq']
+        seq_ok = isinstance(seq, int) and not isinstance(seq, bool) and 0 <= seq < len(QUESTION_TEXT)
+        return value_ok and rt_ok and timed_out_ok and seq_ok
 
-    if set(answers) != expected or any(not is_valid_entry(entry) for entry in answers.values()):
+    seqs_ok = {entry['seq'] for entry in answers.values() if isinstance(entry, dict) and 'seq' in entry} \
+        == set(range(len(QUESTION_TEXT)))
+    if set(answers) != expected or not seqs_ok or any(not is_valid_entry(entry) for entry in answers.values()):
         return HttpResponseBadRequest('invalid answers')
 
     if request.session.get('local_test_mode'):

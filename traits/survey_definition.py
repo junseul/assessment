@@ -248,30 +248,44 @@ FAST_RESPONSE_THRESHOLD_MS = 1500
 
 
 def response_quality(answers):
-    """Order-independent response-quality signals across all 170 items.
+    """Response-quality signals across all 170 items.
 
-    Postgres jsonb (this project's JSONField backend) does not guarantee
-    object key order is preserved on write, so a straightlining/streak
-    metric (same answer N times in a row) can't be computed reliably from
-    the stored `answers` dict alone -- that needs an explicit sequence
-    number captured at submit time, which is a separate, larger change.
+    `seq` (the on-screen presentation order, 0-indexed) is stored per answer
+    because Postgres jsonb -- this project's JSONField backend -- doesn't
+    guarantee object key order survives a write, so the stored `answers`
+    dict's own key order can't be trusted to reflect actual response
+    sequence. Older SurveyResponses saved before `seq` existed simply don't
+    have it, so max_same_answer_streak degrades to None for those.
     """
     values = []
     rts = []
     timed_out = 0
+    ordered = []
     for number in range(1, len(QUESTION_TEXT) + 1):
         entry = answers.get(f'q{number:03d}')
         value = entry.get('value') if isinstance(entry, dict) else entry
         rt = entry.get('rt_ms') if isinstance(entry, dict) else None
+        seq = entry.get('seq') if isinstance(entry, dict) else None
         if isinstance(entry, dict) and entry.get('timed_out'):
             timed_out += 1
         if isinstance(value, (int, float)) and 1 <= value <= 5:
             values.append(value)
+            if isinstance(seq, int):
+                ordered.append((seq, value))
         if isinstance(rt, (int, float)) and rt >= 0:
             rts.append(rt)
 
     extreme_count = sum(1 for v in values if v in (1, 5))
     fast_count = sum(1 for rt in rts if rt < FAST_RESPONSE_THRESHOLD_MS)
+
+    streak = None
+    if ordered:
+        ordered.sort(key=lambda pair: pair[0])
+        streak = 1
+        current = 1
+        for (_, prev), (_, curr) in zip(ordered, ordered[1:]):
+            current = current + 1 if curr == prev else 1
+            streak = max(streak, current)
 
     return {
         'answered': len(values),
@@ -279,6 +293,7 @@ def response_quality(answers):
         'extreme_response_rate': round(extreme_count / len(values), 3) if values else None,
         'avg_rt_ms': round(sum(rts) / len(rts), 1) if rts else None,
         'fast_response_rate': round(fast_count / len(rts), 3) if rts else None,
+        'max_same_answer_streak': streak,
     }
 
 

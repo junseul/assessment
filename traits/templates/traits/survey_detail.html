@@ -65,6 +65,7 @@ function finishQuestion(value, selectedButton) {
     value: value,
     rt_ms: Date.now() - questionShownAt,
     timed_out: value === null,
+    seq: currentIndex,
   };
   if (selectedButton) selectedButton.classList.add('active');
   setTimeout(function () {

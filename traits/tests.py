@@ -18,7 +18,7 @@ class SurveySubmitTests(TestCase):
         )
         self.url = reverse('traits:submit_response', args=[self.survey.pk])
         self.answers = {
-            f'q{number:03d}': {'value': 3, 'rt_ms': 2000, 'timed_out': False}
+            f'q{number:03d}': {'value': 3, 'rt_ms': 2000, 'timed_out': False, 'seq': number - 1}
             for number in range(1, 171)
         }
 
@@ -72,7 +72,7 @@ class SurveySubmitTests(TestCase):
 
     def test_timed_out_answer_with_null_value_accepted(self):
         answers = dict(self.answers)
-        answers['q001'] = {'value': None, 'rt_ms': 8000, 'timed_out': True}
+        answers['q001'] = {'value': None, 'rt_ms': 8000, 'timed_out': True, 'seq': 0}
         response = self.client.post(
             self.url, data=json.dumps({'answers': answers}), content_type='application/json',
         )
@@ -80,7 +80,7 @@ class SurveySubmitTests(TestCase):
 
     def test_negative_rt_ms_rejected(self):
         answers = dict(self.answers)
-        answers['q001'] = {'value': 3, 'rt_ms': -1, 'timed_out': False}
+        answers['q001'] = {'value': 3, 'rt_ms': -1, 'timed_out': False, 'seq': 0}
         response = self.client.post(
             self.url, data=json.dumps({'answers': answers}), content_type='application/json',
         )
@@ -88,7 +88,23 @@ class SurveySubmitTests(TestCase):
 
     def test_timed_out_flag_inconsistent_with_value_rejected(self):
         answers = dict(self.answers)
-        answers['q001'] = {'value': 3, 'rt_ms': 2000, 'timed_out': True}
+        answers['q001'] = {'value': 3, 'rt_ms': 2000, 'timed_out': True, 'seq': 0}
+        response = self.client.post(
+            self.url, data=json.dumps({'answers': answers}), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_duplicate_seq_rejected(self):
+        answers = dict(self.answers)
+        answers['q001'] = dict(answers['q001'], seq=answers['q002']['seq'])
+        response = self.client.post(
+            self.url, data=json.dumps({'answers': answers}), content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_seq_out_of_range_rejected(self):
+        answers = dict(self.answers)
+        answers['q001'] = dict(answers['q001'], seq=999)
         response = self.client.post(
             self.url, data=json.dumps({'answers': answers}), content_type='application/json',
         )
@@ -124,7 +140,9 @@ class ResponseQualityTests(TestCase):
 
     def make_answers(self, value_for, rt_for=lambda n: 3000):
         return {
-            f'q{n:03d}': {'value': value_for(n), 'rt_ms': rt_for(n), 'timed_out': value_for(n) is None}
+            f'q{n:03d}': {
+                'value': value_for(n), 'rt_ms': rt_for(n), 'timed_out': value_for(n) is None, 'seq': n - 1,
+            }
             for n in range(1, len(QUESTION_TEXT) + 1)
         }
 
@@ -164,4 +182,22 @@ class ResponseQualityTests(TestCase):
         self.assertIsNone(quality['extreme_response_rate'])
         self.assertIsNone(quality['avg_rt_ms'])
         self.assertIsNone(quality['fast_response_rate'])
+        self.assertIsNone(quality['max_same_answer_streak'])
+
+    def test_straightlining_is_detected_via_presentation_order_not_question_number(self):
+        # seq (presentation order) disagrees with question number: q001 and
+        # q003 were actually shown consecutively (seq 0, 1) and both answered
+        # "3"; q002 was shown right after (seq 2) with a different answer, so
+        # the true streak is 2 -- not something q-number order would show.
+        answers = {
+            'q001': {'value': 3, 'rt_ms': 2000, 'timed_out': False, 'seq': 0},
+            'q003': {'value': 3, 'rt_ms': 2000, 'timed_out': False, 'seq': 1},
+            'q002': {'value': 5, 'rt_ms': 2000, 'timed_out': False, 'seq': 2},
+        }
+        quality = response_quality(answers)
+        self.assertEqual(quality['max_same_answer_streak'], 2)
+
+    def test_older_responses_without_seq_degrade_to_none_streak(self):
+        quality = response_quality({'q001': {'value': 3, 'rt_ms': 2000, 'timed_out': False}})
+        self.assertIsNone(quality['max_same_answer_streak'])
 

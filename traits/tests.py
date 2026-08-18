@@ -6,7 +6,7 @@ from django.urls import reverse
 from helpers import login_candidate
 
 from .models import Survey, SurveyResponse
-from .survey_definition import score_answers
+from .survey_definition import QUESTION_TEXT, response_quality, score_answers
 
 
 class SurveySubmitTests(TestCase):
@@ -116,4 +116,52 @@ class SurveyScoringTests(TestCase):
         self.assertEqual(domains[0]['timed_out'], 1)
         self.assertEqual(domains[0]['answered'], 1)
         self.assertEqual(domains[0]['average'], 4)
+
+
+class ResponseQualityTests(TestCase):
+    """Simulated response patterns per the improvement directive's section 9:
+    all-max, all-min, mid-only, random, and abnormally-fast responding."""
+
+    def make_answers(self, value_for, rt_for=lambda n: 3000):
+        return {
+            f'q{n:03d}': {'value': value_for(n), 'rt_ms': rt_for(n), 'timed_out': value_for(n) is None}
+            for n in range(1, len(QUESTION_TEXT) + 1)
+        }
+
+    def test_all_max_answers_are_fully_extreme(self):
+        quality = response_quality(self.make_answers(lambda n: 5))
+        self.assertEqual(quality['answered'], len(QUESTION_TEXT))
+        self.assertEqual(quality['extreme_response_rate'], 1.0)
+
+    def test_all_min_answers_are_fully_extreme(self):
+        quality = response_quality(self.make_answers(lambda n: 1))
+        self.assertEqual(quality['extreme_response_rate'], 1.0)
+
+    def test_all_midpoint_answers_have_zero_extreme_rate(self):
+        quality = response_quality(self.make_answers(lambda n: 3))
+        self.assertEqual(quality['extreme_response_rate'], 0.0)
+
+    def test_random_answers_extreme_rate_within_bounds(self):
+        import random
+        rng = random.Random(42)
+        quality = response_quality(self.make_answers(lambda n: rng.randint(1, 5)))
+        self.assertIsNotNone(quality['extreme_response_rate'])
+        self.assertGreaterEqual(quality['extreme_response_rate'], 0.0)
+        self.assertLessEqual(quality['extreme_response_rate'], 1.0)
+
+    def test_abnormally_fast_responses_are_flagged(self):
+        quality = response_quality(self.make_answers(lambda n: 3, rt_for=lambda n: 200))
+        self.assertEqual(quality['fast_response_rate'], 1.0)
+        self.assertEqual(quality['avg_rt_ms'], 200)
+
+    def test_normal_pace_responses_are_not_flagged_as_fast(self):
+        quality = response_quality(self.make_answers(lambda n: 3, rt_for=lambda n: 4000))
+        self.assertEqual(quality['fast_response_rate'], 0.0)
+
+    def test_empty_answers_return_none_rates_not_errors(self):
+        quality = response_quality({})
+        self.assertEqual(quality['answered'], 0)
+        self.assertIsNone(quality['extreme_response_rate'])
+        self.assertIsNone(quality['avg_rt_ms'])
+        self.assertIsNone(quality['fast_response_rate'])
 

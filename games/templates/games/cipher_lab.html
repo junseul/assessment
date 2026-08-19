@@ -2,6 +2,7 @@
 {% block title %}전략게임: 암호 연구소{% endblock %}
 {% block extra_head %}
 <script src="https://unpkg.com/jspsych@7.3.4"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
 <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
 <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
 <style>
@@ -13,17 +14,17 @@
     border: none;
     border-radius: var(--radius-buttons);
   }
-  .cipher-row { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 12px 0; }
-  .cipher-panel { display: flex; gap: 4px; align-items: center; justify-content: center; min-height: 60px; min-width: 60px; background: #fff; border: 1px solid var(--color-ash-border); border-radius: 8px; padding: 8px; }
+  .cipher-row { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 12px 0; flex-wrap: wrap; }
+  .cipher-panel { display: flex; gap: 4px; align-items: center; justify-content: center; min-height: 60px; min-width: 60px; background: #fff; border: 1px solid var(--color-ash-border); border-radius: 8px; padding: 8px; overflow: hidden; }
   .cipher-arrow-sep { font-size: 18px; color: var(--color-fog-text); }
-  .cipher-option-num { text-align: center; font-size: 12px; color: var(--color-steel-text); margin-top: 4px; }
+  .cipher-option-btn { background: transparent; border: none; padding: 4px; }
 </style>
 {% endblock %}
 {% block content %}
 <div style="max-width: 640px; margin: 40px auto 0;">
   <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
     <h1 style="font-size: 24px;">전략게임 · 암호 연구소 (6/9)</h1>
-    <p>{{ candidate_name }}님, 화살표 기호가 규칙에 따라 변합니다. 앞의 3단계를 보고 규칙을 찾아, 다음에 올 4번째 상태와 같은 번호를 선택하세요.</p>
+    <p>{{ candidate_name }}님, 화살표 기호가 규칙에 따라 변합니다. 앞의 3단계를 보고 규칙을 찾아, 다음에 올 4번째 상태와 같은 보기를 클릭하세요.</p>
     <button id="startBtn" class="btn btn-primary">게임 시작</button>
   </div>
   <div id="jspsych-target" style="display: none;"></div>
@@ -64,10 +65,21 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     };
   }
 
+  function glyphSlotSize(state) {
+    // bounding box of a size x size glyph rotated by state.rotation degrees,
+    // so the rotated glyph never paints outside its slot
+    const rot = ((state.rotation % 90) + 90) % 90;
+    const rad = Math.min(rot, 90 - rot) * Math.PI / 180;
+    return Math.ceil(state.size * (Math.cos(rad) + Math.sin(rad)));
+  }
+
   function renderPanel(state) {
     let inner = '';
+    const slot = glyphSlotSize(state);
     for (let i = 0; i < state.count; i++) {
-      inner += '<span style="font-size:' + state.size + 'px; line-height:1; transform:rotate(' + state.rotation + 'deg); color:#2f6fed; display:inline-block;">&#10148;</span>';
+      inner += '<span style="display:inline-flex; align-items:center; justify-content:center; width:' + slot + 'px; height:' + slot + 'px;">' +
+        '<span style="font-size:' + state.size + 'px; line-height:1; transform:rotate(' + state.rotation + 'deg); color:#2f6fed; display:inline-block;">&#10148;</span>' +
+        '</span>';
     }
     return '<div class="cipher-panel">' + inner + '</div>';
   }
@@ -128,10 +140,13 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   let tier = 1;
   let streak = 0;
   let currentItem = null;
+  const N_ITEMS = 15;
+  const progress = createGameProgress(document.getElementById('jspsych-target'), N_ITEMS, null, '문항');
 
   const jsPsych = initJsPsych({
     display_element: 'jspsych-target',
     on_finish: function () {
+      progress.finish();
       const trials = jsPsych.data.get()
         .filterCustom(function (t) { return t.trial_stage === 'cipher'; })
         .values();
@@ -174,18 +189,18 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     },
   });
 
-  const N_ITEMS = 20;
   const timeline = [];
 
   timeline.push({
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: '<p>기호가 규칙에 따라 변합니다. 앞 3단계를 보고 4번째 상태를 골라 아래 번호 버튼을 누르세요.</p><p>준비되면 스페이스바를 누르세요.</p>',
+    stimulus: '<p>기호가 규칙에 따라 변합니다. 앞 3단계를 보고 4번째 상태와 같은 보기를 클릭하세요.</p><p>준비되면 스페이스바를 누르세요.</p>',
     choices: "ALL_KEYS",
   });
 
   for (let i = 0; i < N_ITEMS; i++) {
     timeline.push({
       type: jsPsychHtmlButtonResponse,
+      on_start: function () { progress.set(i + 1); },
       stimulus: function () {
         currentItem = generateItem(tier);
         let html = '<div class="cipher-row">';
@@ -194,15 +209,10 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
           if (idx < currentItem.panels.length - 1) html += '<span class="cipher-arrow-sep">&rarr;</span>';
         });
         html += '<span class="cipher-arrow-sep">&rarr;</span><div class="cipher-panel">?</div></div>';
-        html += '<div class="cipher-row">';
-        currentItem.options.forEach(function (opt) { html += renderPanel(opt); });
-        html += '</div>';
-        html += '<div class="cipher-row">' +
-          currentItem.options.map(function (_, idx) { return '<div class="cipher-option-num" style="width:76px;">' + (idx + 1) + '</div>'; }).join('') +
-          '</div>';
         return html;
       },
-      choices: ['1', '2', '3', '4'],
+      choices: function () { return currentItem.options.map(function (opt) { return renderPanel(opt); }); },
+      button_html: '<button class="jspsych-btn cipher-option-btn">%choice%</button>',
       data: { trial_stage: 'cipher' },
       on_finish: function (data) {
         data.correct = Number(data.response) === currentItem.correctIndex;

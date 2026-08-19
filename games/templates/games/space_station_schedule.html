@@ -49,14 +49,15 @@ function runGame() {
   const stimEl = document.getElementById('ssStim');
   const clockDisplay = document.getElementById('clockDisplay');
 
-  const SESSION_DURATION_MS = 360000; // 6 min
+  const SESSION_DURATION_MS = 240000; // 4 min
+  const progress = createGameProgress(document.getElementById('jspsych-target'), null, SESSION_DURATION_MS);
   const RESPONSE_WINDOW_MS = 1500;
   const ISI_MS = 400;
-  const TIME_TARGETS_MS = [120000, 240000]; // event-based promises kept separate from these
+  const TIME_TARGETS_MS = [80000, 160000]; // event-based promises kept separate from these
   const TIME_WINDOW_MS = 15000;
   const EVENT_CUE_INDICES = [
-    20 + Math.floor(Math.random() * 50),
-    100 + Math.floor(Math.random() * 50),
+    20 + Math.floor(Math.random() * 30),
+    70 + Math.floor(Math.random() * 40),
   ];
 
   const sessionStart = performance.now();
@@ -157,6 +158,7 @@ function runGame() {
   }
 
   function finish() {
+    progress.finish();
     document.removeEventListener('keydown', handleKeydown);
 
     const ongoingAccuracy = ongoingResults.length

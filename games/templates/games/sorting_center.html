@@ -72,9 +72,12 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
   }
 
+  let progress;
+
   const jsPsych = initJsPsych({
     display_element: 'jspsych-target',
     on_finish: function () {
+      progress.finish();
       const trials = jsPsych.data.get()
         .filterCustom(function (t) { return t.trial_stage === 'sort'; })
         .values();
@@ -120,7 +123,8 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     },
   });
 
-  const N_TRIALS = 120;
+  const N_TRIALS = 70;
+  progress = createGameProgress(document.getElementById('jspsych-target'), N_TRIALS);
   const SWITCH_RATE = 0.5;
 
   const timeline = [];
@@ -156,6 +160,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
 
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
+      on_start: function () { progress.set(i + 1); },
       stimulus:
         '<div class="sort-rule">' + (rule === 'color' ? '색상 기준' : '모양 기준') + '</div>' +
         '<div class="sort-item" style="background:' + COLORS[colorIdx] + ';' +

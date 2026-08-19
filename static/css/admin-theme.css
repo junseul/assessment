@@ -274,6 +274,70 @@ div.breadcrumbs {
     overflow: auto;
 }
 
+#changelist-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color);
+    background: #ffffff;
+}
+
+#changelist-search > div {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+}
+
+#changelist-search input[type="text"] {
+    min-width: 0;
+    max-width: 480px;
+    flex: 1;
+}
+
+#changelist-filter li.selected {
+    border-left-color: var(--primary);
+    background: #fffbd1;
+}
+
+#changelist .paginator {
+    margin: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--border-color);
+    border-top: 0;
+    background: #ffffff;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.status-complete {
+    background: var(--message-success-bg);
+    color: #176b2c;
+}
+
+.status-pending {
+    background: var(--message-warning-bg);
+    color: #765b00;
+}
+
+.messagelist li {
+    border: 1px solid var(--border-color);
+    border-radius: var(--lightdash-radius);
+}
+
+.errornote,
+ul.errorlist {
+    border-radius: var(--lightdash-radius);
+}
+
 #changelist table thead th {
     background: #f2f2f2;
     color: #222222;
@@ -410,5 +474,31 @@ a.button {
 
     #content {
         padding: 20px;
+    }
+
+    #toggle-nav-sidebar {
+        display: block;
+    }
+
+    .main.shifted > #nav-sidebar {
+        display: block;
+        position: fixed;
+        z-index: 20;
+        top: 0;
+        bottom: 0;
+        overflow-y: auto;
+    }
+
+    #changelist-search > div,
+    .submit-row,
+    .dashboard-action-links {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    #changelist-search input[type="text"] {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
     }
 }

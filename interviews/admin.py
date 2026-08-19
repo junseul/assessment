@@ -8,6 +8,9 @@ class InterviewResponseAdmin(admin.ModelAdmin):
     list_display = ('id', 'candidate', 'respondent_email', 'created_at', 'follow_up_submitted_at')
     list_filter = ('created_at', 'follow_up_submitted_at')
     search_fields = ('candidate__name', 'candidate__email', 'respondent_email', 'transcript')
+    list_select_related = ('candidate',)
+    date_hierarchy = 'created_at'
+    list_per_page = 50
     readonly_fields = ('transcript', 'follow_up_question', 'created_at', 'follow_up_submitted_at')
     fieldsets = (
         ('응시 정보', {'fields': ('candidate', 'respondent_email', 'created_at')}),

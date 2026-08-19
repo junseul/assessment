@@ -4,6 +4,7 @@ from django.urls import reverse
 
 from games.models import GameResult
 from helpers import make_candidate
+from invites.models import Invite
 from traits.models import Survey, SurveyResponse
 
 
@@ -53,6 +54,15 @@ class AdminDashboardTests(TestCase):
         response = self.client.get(f'/admin/invites/candidate/{candidate.pk}/change/')
         self.assertContains(response, '기본 정보')
         self.assertContains(response, '연락처')
+    def test_admin_lists_have_consistent_navigation_helpers(self):
+        candidate = make_candidate()
+        response = self.client.get('/admin/invites/candidate/')
+        self.assertContains(response, reverse('reports:candidate_detail', args=[candidate.pk]))
+        self.assertContains(response, 'created_at__year')
+
+        Invite.objects.create(candidate=candidate)
+        invite_response = self.client.get('/admin/invites/invite/')
+        self.assertContains(invite_response, 'status-badge')
 
 
 class RootRedirectTests(TestCase):

@@ -206,6 +206,107 @@ dl.report-dl dd { margin: 0; font-size: 14px; }
 
 .meta { color: var(--color-fog-text); font-size: 13px; }
 
+.game-progress {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-mist-border);
+  background: var(--color-canvas-white);
+  color: var(--color-steel-text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-progress strong { color: var(--color-graphite-heading); }
+
+.game-hub-page { min-height: 100vh; margin: 0; background: #f7f9fb; }
+.game-hub {
+  width: min(100%, 1060px);
+  margin: 0 auto;
+  padding: 56px 24px 72px;
+}
+.game-hub-heading { max-width: 680px; margin: 0 auto 40px; text-align: center; }
+.game-hub-heading h1 { margin: 10px 0 12px; font-size: 32px; line-height: 1.2; }
+.game-hub-heading p { margin: 0; color: var(--color-steel-text); }
+.game-hub-eyebrow {
+  color: #0050cb;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+.game-select-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.game-select-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 230px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 24px;
+  border: 1px solid #e0e3e5;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+  color: var(--color-graphite-heading);
+  text-align: center;
+  text-decoration: none;
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.game-select-card:hover,
+.game-select-card:focus-visible {
+  transform: translateY(-4px);
+  border-color: rgba(0, 80, 203, .35);
+  box-shadow: 0 16px 28px rgba(15, 23, 42, .1);
+  outline: none;
+  text-decoration: none;
+}
+.game-select-icon {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: #f2f4f6;
+  color: #0050cb;
+  transition: background .2s ease;
+}
+.game-select-card:hover .game-select-icon { background: #e8efff; }
+.game-select-icon svg { width: 34px; height: 34px; }
+.game-select-card strong { font-size: 18px; line-height: 1.4; }
+.game-select-description {
+  display: -webkit-box;
+  min-height: 40px;
+  margin-top: 8px;
+  overflow: hidden;
+  color: var(--color-steel-text);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.game-select-status {
+  margin-top: 14px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eceef0;
+  color: #424656;
+  font-size: 12px;
+  font-weight: 600;
+}
+.game-select-number {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  color: #8a8a8a;
+  font: 12px var(--font-mono);
+}
+.game-select-card.is-complete { background: #f2f4f6; box-shadow: none; }
+.game-select-card.is-complete .game-select-status { background: #dcefe3; color: #176b2c; }
+
 .candidate-list { list-style: none; padding: 0; margin: 0; }
 .candidate-list li + li { border-top: 1px solid var(--color-ash-border); }
 .candidate-list a {
@@ -252,10 +353,20 @@ dl.report-dl dd { margin: 0; font-size: 14px; }
 .trait-choice.active strong { background: #000000; color: #ffffff; }
 
 @media (max-width: 700px) {
+  .game-hub { padding: 36px 16px 48px; }
+  .game-hub-heading { margin-bottom: 28px; }
+  .game-hub-heading h1 { font-size: 26px; }
+  .game-select-grid { grid-template-columns: 1fr; gap: 16px; }
+  .game-select-card { min-height: 210px; }
+  .game-progress { flex-direction: column; gap: 4px; }
   .trait-status { grid-template-columns: 1fr; gap: 16px; }
   .trait-question-context { min-height: 190px; padding: 28px 0 20px; }
   .trait-question-context h2 { font-size: 22px; }
   .trait-choices { grid-template-columns: 1fr; padding: 12px; }
   .trait-choice { min-height: 58px; flex-direction: row; justify-content: flex-start; padding: 8px 12px; text-align: left; }
   .trait-choice strong { width: 36px; height: 36px; flex: 0 0 36px; }
+}
+
+@media (min-width: 701px) and (max-width: 960px) {
+  .game-select-grid { grid-template-columns: repeat(2, 1fr); }
 }

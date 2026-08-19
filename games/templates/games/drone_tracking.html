@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}전략게임: 드론 추적{% endblock %}
 {% block extra_head %}
 <style>
@@ -7,8 +8,11 @@
     margin: 0 auto; background: var(--color-cloud-mist); border-radius: var(--radius-cards);
     overflow: hidden; user-select: none;
   }
-  .drone { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #7b8794; }
-  .drone.target-highlight { background: #e5484d; }
+  .drone {
+    position: absolute; width: 32px; height: 32px;
+    background: url("{% static 'images/games/drone.png' %}") center / contain no-repeat;
+  }
+  .drone.target-highlight { filter: drop-shadow(0 0 2px #e5484d) drop-shadow(0 0 5px #e5484d); }
   .drone.selectable { cursor: pointer; }
   .drone.selected { outline: 3px solid #22a06b; outline-offset: 2px; }
   #motStatus { text-align: center; margin-top: 16px; font-size: 14px; color: var(--color-steel-text); }
@@ -50,11 +54,12 @@ function runGame() {
   const statusEl = document.getElementById('motStatus');
   const confirmBtn = document.getElementById('motConfirm');
 
-  const N_TRIALS = 20;
+  const N_TRIALS = 12;
+  const progress = createGameProgress(document.getElementById('jspsych-target'), N_TRIALS);
   const N_OBJECTS = 10;
   const HIGHLIGHT_MS = 2000;
   const MOVE_MS = 6000;
-  const RADIUS = 13;
+  const RADIUS = 16;
   const SPEED = 90; // px/sec
   const MIN_TARGETS = 2;
   const MAX_TARGETS = 5;
@@ -189,11 +194,13 @@ function runGame() {
   function nextTrial() {
     if (trialNum >= N_TRIALS) return finish();
     trialNum++;
+    progress.set(trialNum);
     statusEl.textContent = '';
     setTimeout(function () { runTrial(nextTrial); }, 500);
   }
 
   function finish() {
+    progress.finish();
     const accByCount = {};
     trials.forEach(function (t) {
       const key = String(t.n_targets);

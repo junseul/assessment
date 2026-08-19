@@ -69,10 +69,13 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
 
   let runningTotal = 0;
   let lastOutcome = null;
+  const N_ROUNDS = 50; // must match EXPEDITION_TRIALS in games/views.py
+  const progress = createGameProgress(document.getElementById('jspsych-target'), N_ROUNDS);
 
   const jsPsych = initJsPsych({
     display_element: 'jspsych-target',
     on_finish: function () {
+      progress.finish();
       const choiceTrials = jsPsych.data.get().filterCustom(function (t) { return t.trial_stage === 'choice'; }).values();
 
       function proportions(list) {
@@ -200,11 +203,16 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   }
 
   // Each round is resolved by the server (see resolveDeck) so the payoff table
-  // and reversal point are never sent to the browser. Trials are appended one
-  // at a time via addNodeToEndOfTimeline once each round's result is back.
+  // and reversal point are never sent to the browser. The click ends this
+  // trial immediately, but the server round-trip is still in flight, so a
+  // static waitTrial (below) always follows it in the timeline and is only
+  // ended once resolveDeck's promise resolves. That keeps the timeline from
+  // ever running out of nodes mid-flight, which used to end the whole
+  // experiment early (and crash on missing data) before the server replied.
   function choiceTrial(i) {
     return {
       type: jsPsychHtmlButtonResponse,
+      on_start: function () { progress.set(i + 1); },
       stimulus: function () { return '<p>누적 자원: ' + runningTotal + '</p><p>탐사할 지역을 선택하세요.</p>'; },
       choices: ['A 지역', 'B 지역', 'C 지역', 'D 지역'],
       data: { trial_stage: 'choice', trial_index: i },
@@ -220,13 +228,19 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
           data.running_total = result.running_total;
           data.phase = result.phase;
 
-          const nextNodes = [feedbackTrial()];
-          if (!result.done) nextNodes.push(choiceTrial(i + 1));
-          jsPsych.addNodeToEndOfTimeline({ timeline: nextNodes });
+          jsPsych.finishTrial();
         }).catch(function () {
           alert('통신 오류로 게임을 진행할 수 없습니다. 새로고침 후 다시 시도해주세요.');
         });
       },
+    };
+  }
+
+  function waitTrial() {
+    return {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function () { return '<p>누적 자원: ' + runningTotal + '</p><p>결과를 확인하는 중...</p>'; },
+      choices: 'NO_KEYS',
     };
   }
 
@@ -236,7 +250,11 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     stimulus: '<p>A, B, C, D 네 지역 중 하나를 반복해서 선택하며 자원을 최대한 모으세요.<br>확률은 알려드리지 않습니다.</p><p>준비되면 스페이스바를 누르세요.</p>',
     choices: "ALL_KEYS",
   });
-  timeline.push(choiceTrial(0));
+  for (let i = 0; i < N_ROUNDS; i++) {
+    timeline.push(choiceTrial(i));
+    timeline.push(waitTrial());
+    timeline.push(feedbackTrial());
+  }
 
   jsPsych.run(timeline);
 });

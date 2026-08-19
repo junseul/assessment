@@ -75,9 +75,12 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     return den === 0 ? null : num / den;
   }
 
+  let progress;
+
   const jsPsych = initJsPsych({
     display_element: 'jspsych-target',
     on_finish: function () {
+      progress.finish();
       const trials = jsPsych.data.get()
         .filterCustom(function (t) { return t.trial_stage === 'search'; })
         .values();
@@ -118,7 +121,8 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     },
   });
 
-  const N_TRIALS = 100;
+  const N_TRIALS = 50;
+  progress = createGameProgress(document.getElementById('jspsych-target'), N_TRIALS);
   const BASE_SET_SIZES = [10, 20, 30, 40];
   let setSizeShift = 0; // ponytail: two-phase shift, not per-trial adaptation (keeps set-size variance for the slope calc)
   let firstHalfCorrect = 0;
@@ -149,6 +153,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
 
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
+      on_start: function () { progress.set(i + 1); },
       stimulus: buildGrid(setSize, hasTarget),
       choices: ['f', 'j'],
       trial_duration: 4000,

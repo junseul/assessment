@@ -8,6 +8,9 @@ class GameResultAdmin(admin.ModelAdmin):
     list_display = ('id', 'candidate', 'game_slug', 'respondent_email', 'created_at')
     list_filter = ('game_slug', 'created_at')
     search_fields = ('candidate__name', 'candidate__email', 'respondent_email')
+    list_select_related = ('candidate',)
+    date_hierarchy = 'created_at'
+    list_per_page = 50
     readonly_fields = ('created_at',)
     fieldsets = (
         ('응시 정보', {'fields': ('candidate', 'game_slug', 'respondent_email', 'created_at')}),

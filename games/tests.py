@@ -80,6 +80,8 @@ class GameSubmitTests(TestCase):
         response = self.client.get(reverse('games:play', args=[self.slug]))
         self.assertContains(response, 'choices: "ALL_KEYS"')
         self.assertContains(response, "compareKeys(data.response, ' ')")
+        self.assertContains(response, '/static/images/games/aircraft-normal.svg')
+        self.assertContains(response, '/static/images/games/aircraft-danger.svg')
 
     def test_play_page_is_frameable_from_same_origin(self):
         # Admin's local-test grid (games.views.admin_grid) embeds this page
@@ -98,6 +100,25 @@ class GameSubmitTests(TestCase):
             self.assertContains(response, title)
         self.assertNotContains(response, '준비중')
         self.assertContains(response, '시작하기', count=9)
+        self.assertContains(response, 'class="game-select-card"', count=9)
+
+    def test_every_game_exposes_progress_information(self):
+        expected_lengths = {
+            'radar-control': 'N_TRIALS = 70',
+            'emergency-brake': 'N_TRIALS = 70',
+            'sorting-center': 'N_TRIALS = 70',
+            'space-station-schedule': 'SESSION_DURATION_MS = 240000',
+            'drone-tracking': 'N_TRIALS = 12',
+            'quality-inspector': 'N_TRIALS = 50',
+            'cipher-lab': 'N_ITEMS = 15',
+            'flash-comm': 'N_SEQUENCES = 24',
+            'expedition-investment': "'jspsych-target'), 50",
+        }
+        for slug, expected_length in expected_lengths.items():
+            with self.subTest(slug=slug):
+                response = self.client.get(reverse('games:play', args=[slug]))
+                self.assertContains(response, 'createGameProgress')
+                self.assertContains(response, expected_length)
 
     def test_same_email_candidates_are_isolated(self):
         self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
@@ -222,6 +243,7 @@ class CipherLabTests(TestCase):
 
     def test_game_renders_option_grid(self):
         response = self.client.get(reverse('games:play', args=[self.slug]))
+        self.assertContains(response, 'plugin-html-keyboard-response')
         self.assertContains(response, "choices: ['1', '2', '3', '4']")
         self.assertContains(response, 'cipher-panel')
 
@@ -296,7 +318,7 @@ class ExpeditionInvestmentTests(TestCase):
     def test_client_relies_on_server_done_flag_not_a_hardcoded_trial_count(self):
         # Trial count used to be duplicated as N_TRIALS on the client and
         # EXPEDITION_TRIALS on the server; if they drifted apart the client
-        # would stop early or the 101st round request would 400. The client
+        # would stop early or an extra round request would 400. The client
         # now just stops when the server says done.
         response = self.client.get(reverse('games:play', args=[self.slug]))
         self.assertNotContains(response, 'N_TRIALS')
@@ -332,7 +354,7 @@ class ExpeditionInvestmentTests(TestCase):
 
     def test_round_endpoint_marks_done_on_last_round(self):
         round_url = reverse('games:expedition_round')
-        for _ in range(99):
+        for _ in range(49):
             response = self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
             self.assertFalse(response.json()['done'])
         response = self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
@@ -368,14 +390,14 @@ class ExpeditionInvestmentTests(TestCase):
 
     def test_round_endpoint_flips_to_post_phase_after_reversal_index(self):
         round_url = reverse('games:expedition_round')
-        for _ in range(50):
+        for _ in range(25):
             self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
         response = self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
         self.assertEqual(response.json()['phase'], 'post')
 
-    def test_round_endpoint_blocks_after_100_rounds(self):
+    def test_round_endpoint_blocks_after_50_rounds(self):
         round_url = reverse('games:expedition_round')
-        for _ in range(100):
+        for _ in range(50):
             self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
         response = self.client.post(round_url, data=json.dumps({'deck': 'A'}), content_type='application/json')
         self.assertEqual(response.status_code, 400)

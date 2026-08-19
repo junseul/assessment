@@ -1,25 +1,30 @@
 {% extends "base.html" %}
 {% block title %}전략게임{% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <h1 style="font-size: 24px;">전략게임</h1>
-  <p style="margin-bottom: 24px;">{{ candidate_name }}님, 아래 9개 과제로 구성된 인지능력 게임입니다. 순서대로 진행해주세요.</p>
+<section class="game-hub">
+  <header class="game-hub-heading">
+    <span class="game-hub-eyebrow">STRATEGY GAME</span>
+    <h1>전략게임을 선택하세요</h1>
+    <p>{{ candidate_name }}님, 아래 9개 인지능력 게임을 순서대로 진행해 주세요.</p>
+  </header>
+  <div class="game-select-grid">
   {% for game in games %}
-  <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
-      <div>
-        <h3 style="margin-bottom: 4px;">{{ forloop.counter }}. {{ game.title }}</h3>
-        <p class="meta" style="margin: 0;">{{ game.description }}</p>
+    {% if game.done %}
+      <div class="game-select-card is-complete">
+    {% else %}
+      <a class="game-select-card" href="{% url 'games:play' game.slug %}">
+    {% endif %}
+        <span class="game-select-number">{{ forloop.counter|stringformat:"02d" }}</span>
+        <span class="game-select-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">{{ game.icon_svg|safe }}</svg></span>
+        <strong>{{ game.title }}</strong>
+        <span class="game-select-description">{{ game.description }}</span>
+        <span class="game-select-status">{% if game.done %}완료{% else %}시작하기{% endif %}</span>
+    {% if game.done %}
       </div>
-      {% if game.done %}
-        <span class="btn btn-disabled">완료됨</span>
-      {% elif game.implemented %}
-        <a href="{% url 'games:play' game.slug %}" class="btn btn-primary">시작하기</a>
-      {% else %}
-        <span class="badge">준비중</span>
-      {% endif %}
-    </div>
-  </div>
+    {% else %}
+      </a>
+    {% endif %}
   {% endfor %}
-</div>
+  </div>
+</section>
 {% endblock %}

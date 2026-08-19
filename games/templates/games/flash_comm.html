@@ -47,9 +47,12 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
   }
 
+  let progress;
+
   const jsPsych = initJsPsych({
     display_element: 'jspsych-target',
     on_finish: function () {
+      progress.finish();
       const q1s = jsPsych.data.get().filterCustom(function (t) { return t.trial_stage === 't1_question'; }).values();
       const q2s = jsPsych.data.get().filterCustom(function (t) { return t.trial_stage === 't2_question'; }).values();
 
@@ -103,7 +106,8 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   // per-sequence adaptation. RSVP has to be a fully pre-built jsPsych timeline
   // (frames chain synchronously) so there's no clean point to react to
   // accuracy mid-stream the way the other games do with dynamic parameters.
-  const N_SEQUENCES = 40;
+  const N_SEQUENCES = 24;
+  progress = createGameProgress(document.getElementById('jspsych-target'), N_SEQUENCES);
   const LAG_LEVELS = [1, 2, 3, 5, 8];
   const TRAILING_FILLERS = 3;
 
@@ -128,6 +132,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
 
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
+      on_start: function () { progress.set(seqIdx + 1); },
       stimulus: '<div class="rsvp-item filler" style="background:#8b93a1;"></div>',
       choices: 'NO_KEYS',
       trial_duration: 600,

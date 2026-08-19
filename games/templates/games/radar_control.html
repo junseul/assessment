@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}전략게임: 레이더 관제{% endblock %}
 {% block extra_head %}
 <script src="https://unpkg.com/jspsych@7.3.4"></script>
@@ -13,7 +14,10 @@
     border: none;
     border-radius: var(--radius-buttons);
   }
-  .radar-blip { width: 90px; height: 90px; border-radius: 50%; margin: 0 auto; }
+  .radar-aircraft { display: grid; width: 120px; height: 100px; margin: 0 auto; place-items: center; border: 2px solid; border-radius: 12px; }
+  .radar-aircraft img { width: 104px; height: 84px; object-fit: contain; }
+  .radar-aircraft.normal { border-color: #22a06b; background: #e8f6ee; }
+  .radar-aircraft.danger { border-color: #e5484d; background: #fdecec; }
   .radar-label { margin-top: 16px; font-size: 14px; color: var(--color-steel-text); }
 </style>
 {% endblock %}
@@ -37,6 +41,8 @@
 const csrfToken = '{{ csrf_token }}';
 const submitUrl = '{% url "games:submit_result" slug %}';
 const alreadyDone = {{ already_done|yesno:"true,false" }};
+const normalAircraftUrl = "{% static 'images/games/aircraft-normal.svg' %}";
+const dangerAircraftUrl = "{% static 'images/games/aircraft-danger.svg' %}";
 
 if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
   document.getElementById('startGate').style.display = 'none';
@@ -79,9 +85,12 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     return trials.filter(function (t) { return t.correct; }).length / trials.length;
   }
 
+  let progress;
+
   const jsPsych = initJsPsych({
     display_element: 'jspsych-target',
     on_finish: function () {
+      progress.finish();
       const gameTrials = jsPsych.data.get()
         .filterCustom(function (t) { return t.trial_stage === 'go' || t.trial_stage === 'nogo'; })
         .values();
@@ -134,7 +143,8 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     },
   });
 
-  const N_TRIALS = 150;
+  const N_TRIALS = 70;
+  progress = createGameProgress(document.getElementById('jspsych-target'), N_TRIALS);
   const N_NOGO = Math.round(N_TRIALS * 0.15);
   const N_GO = N_TRIALS - N_NOGO;
   const stages = jsPsych.randomization.shuffle(
@@ -152,7 +162,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     choices: "ALL_KEYS",
   });
 
-  stages.forEach(function (stage) {
+  stages.forEach(function (stage, index) {
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
       stimulus: '',
@@ -160,12 +170,14 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
       trial_duration: function () { return 300 + Math.floor(Math.random() * 200); },
     });
 
-    const color = stage === 'go' ? '#22a06b' : '#e5484d';
+    const aircraftClass = stage === 'go' ? 'normal' : 'danger';
+    const aircraftUrl = stage === 'go' ? normalAircraftUrl : dangerAircraftUrl;
     const label = stage === 'go' ? '일반 비행체' : '위험 비행체';
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
+      on_start: function () { progress.set(index + 1); },
       stimulus:
-        '<div class="radar-blip" style="background:' + color + ';"></div>' +
+        '<div class="radar-aircraft ' + aircraftClass + '"><img src="' + aircraftUrl + '" alt="" aria-hidden="true"></div>' +
         '<div class="radar-label">' + label + '</div>',
       choices: "ALL_KEYS",
       trial_duration: function () { return stimDuration; },

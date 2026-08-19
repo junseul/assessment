@@ -100,6 +100,7 @@ class LocalTestTests(TestCase):
         for title in ['레이더 관제', '긴급 제동', '탐사대 투자']:
             self.assertContains(response, title)
         self.assertContains(response, reverse('games:play', args=['radar-control']))
+        self.assertContains(response, 'class="game-select-card"', count=9)
         # Django's default X-Frame-Options: DENY would silently block this
         # page inside the admin_local_test.html iframe.
         self.assertEqual(response.headers.get('X-Frame-Options'), 'SAMEORIGIN')

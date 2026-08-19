@@ -16,8 +16,8 @@ from .models import GameResult
 # shipped to the client (as it used to, inline in the page's <script>), anyone
 # could read exact win/loss odds from devtools and solve the task instead of
 # playing it under genuine uncertainty, which is the thing being measured.
-EXPEDITION_TRIALS = 100
-EXPEDITION_REVERSAL_INDEX = 50
+EXPEDITION_TRIALS = 50
+EXPEDITION_REVERSAL_INDEX = 25
 EXPEDITION_BASE_DECKS = {
     'A': {'win_amt': 100, 'loss_prob': 0.5, 'loss_amt': 250},
     'B': {'win_amt': 100, 'loss_prob': 0.1, 'loss_amt': 1250},

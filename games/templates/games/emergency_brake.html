@@ -64,9 +64,12 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
   }
 
+  let progress;
+
   const jsPsych = initJsPsych({
     display_element: 'jspsych-target',
     on_finish: function () {
+      progress.finish();
       const gameTrials = jsPsych.data.get()
         .filterCustom(function (t) { return t.trial_stage === 'go' || t.trial_stage === 'stop'; })
         .values();
@@ -126,7 +129,8 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     },
   });
 
-  const N_TRIALS = 120;
+  const N_TRIALS = 70;
+  progress = createGameProgress(document.getElementById('jspsych-target'), N_TRIALS);
   const N_STOP = Math.round(N_TRIALS * 0.25);
   const N_GO = N_TRIALS - N_STOP;
   const stages = jsPsych.randomization.shuffle(
@@ -144,7 +148,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     choices: "ALL_KEYS",
   });
 
-  stages.forEach(function (stage) {
+  stages.forEach(function (stage, index) {
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
       stimulus: '',
@@ -158,6 +162,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     // being built (which would freeze every trial at the starting ssd).
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
+      on_start: function () { progress.set(index + 1); },
       stimulus: function () {
         if (stage !== 'stop') {
           return '<div class="brake-box"></div><div class="brake-label">승인 대기 중</div>';

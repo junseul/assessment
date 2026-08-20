@@ -3,38 +3,88 @@
 {% block title %}전략게임: 드론 추적{% endblock %}
 {% block extra_head %}
 <style>
+  /* 전략게임(드론 추적) 전용 스타일 — 다른 화면에 영향을 주지 않도록 .mot- 접두어 사용 */
+  .mot-wrap { max-width: 640px; margin: 40px auto 0; }
+
+  /* 시작 카드 */
+  .mot-eyebrow {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-fog-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .mot-start-card h1 { font-size: 28px; margin: 0 0 12px; }
+  .mot-intro { color: var(--color-slate-body); line-height: 1.6; margin: 0 0 20px; }
+
+  /* 게임 표면 */
+  #jspsych-target { background: transparent; }
   #motArena {
-    position: relative; width: 100%; max-width: 600px; height: 360px;
-    margin: 0 auto; background: var(--color-cloud-mist); border-radius: var(--radius-cards);
-    overflow: hidden; user-select: none;
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    height: 360px;
+    margin: 0 auto;
+    background:
+      linear-gradient(rgba(0, 0, 0, .035) 1px, transparent 1px) 0 0 / 100% 36px,
+      linear-gradient(90deg, rgba(0, 0, 0, .035) 1px, transparent 1px) 0 0 / 36px 100%,
+      var(--color-cloud-mist);
+    border: 1px solid var(--color-mist-border);
+    border-radius: var(--radius-cards);
+    overflow: hidden;
+    user-select: none;
   }
   .drone {
-    position: absolute; width: 32px; height: 32px;
+    position: absolute;
+    width: 32px;
+    height: 32px;
     background: url("{% static 'images/games/drone.png' %}") center / contain no-repeat;
+    transition: filter .12s ease;
   }
   .drone.target-highlight { filter: drop-shadow(0 0 2px #e5484d) drop-shadow(0 0 5px #e5484d); }
   .drone.selectable { cursor: pointer; }
-  .drone.selected { outline: 3px solid #22a06b; outline-offset: 2px; }
-  #motStatus { text-align: center; margin-top: 16px; font-size: 14px; color: var(--color-steel-text); }
+  .drone.selected { outline: 3px solid #22a06b; outline-offset: 2px; border-radius: 4px; }
+
+  #motStatus {
+    text-align: center;
+    margin-top: 16px;
+    min-height: 20px;
+    font-size: 14px;
+    color: var(--color-steel-text);
+  }
   #motConfirm { display: block; margin: 16px auto 0; }
+
+  /* 결과 화면 */
+  .mot-thanks h2 { font-size: 24px; margin: 0 0 8px; }
+
+  @media (max-width: 560px) {
+    #motArena { height: 300px; }
+  }
 </style>
 {% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
-    <h1 style="font-size: 24px;">전략게임 · 드론 추적 (5/9)</h1>
-    <p>{{ candidate_name }}님, 빨간색으로 잠깐 표시되는 드론들을 기억하세요. 이후 모든 드론이 같은 색으로 섞여 움직입니다. 정지하면 처음 표시됐던 드론들을 클릭해 선택하고 확인을 누르세요.</p>
+<div class="mot-wrap">
+  <div id="startGate" class="card mot-start-card"{% if already_done %} style="display: none;"{% endif %}>
+    <span class="mot-eyebrow">STRATEGY GAME · 5/9</span>
+    <h1>드론 추적</h1>
+    <p class="mot-intro">{{ candidate_name }}님, 빨간색으로 잠깐 표시되는 드론들을 기억하세요. 이후 모든 드론이 같은 색으로 섞여 움직입니다. 정지하면 처음 표시됐던 드론들을 클릭해 선택하고 확인을 누르세요.</p>
     <button id="startBtn" class="btn btn-primary">게임 시작</button>
   </div>
-  <div id="jspsych-target" style="display: none;">
-    <div id="motArena"></div>
-    <div id="motStatus"></div>
-    <button id="motConfirm" class="btn btn-primary" style="display: none;" disabled>확인</button>
+
+  <div id="playArea" style="display: none;">
+    <div id="jspsych-target">
+      <div id="motArena"></div>
+      <div id="motStatus"></div>
+      <button id="motConfirm" class="btn btn-primary" style="display: none;" disabled>확인</button>
+    </div>
   </div>
-  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+
+  <div id="thanksMsg" class="card mot-thanks"{% if not already_done %} style="display: none;"{% endif %}>
     <h2>완료</h2>
     <p>결과가 저장되었습니다. 감사합니다.</p>
-    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+    <p><a class="btn btn-ghost" href="{% url 'games:index' %}">전략게임 목록으로</a></p>
   </div>
 </div>
 {% endblock %}
@@ -48,7 +98,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
 
 function runGame() {
   document.getElementById('startGate').style.display = 'none';
-  document.getElementById('jspsych-target').style.display = 'block';
+  document.getElementById('playArea').style.display = 'block';
 
   const arena = document.getElementById('motArena');
   const statusEl = document.getElementById('motStatus');
@@ -225,7 +275,7 @@ function runGame() {
       body: JSON.stringify({ trials: trials, summary: summary }),
     }).then(function (r) {
       if (!r.ok && r.status !== 409) throw new Error('save failed');
-      document.getElementById('jspsych-target').style.display = 'none';
+      document.getElementById('playArea').style.display = 'none';
       document.getElementById('thanksMsg').style.display = 'block';
     }).catch(function () {
       alert('저장에 실패했습니다. 다시 시도해주세요.');

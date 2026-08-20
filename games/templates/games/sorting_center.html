@@ -5,7 +5,46 @@
 <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
 <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
 <style>
-  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
+  /* 전략게임(물류 분류센터) 전용 스타일 — 다른 화면에 영향을 주지 않도록 .sort- 접두어 사용 */
+  .sort-wrap { max-width: 640px; margin: 40px auto 0; }
+
+  /* 시작 카드 */
+  .sort-eyebrow {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-fog-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .sort-start-card h1 { font-size: 28px; margin: 0 0 12px; }
+  .sort-intro { color: var(--color-slate-body); line-height: 1.6; margin: 0 0 20px; }
+
+  /* 지속 상태 영역: 두 분류 기준의 대응을 게임 내내 조용히 상기시킴 */
+  .sort-hud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+    font-size: 13px;
+    color: var(--color-steel-text);
+  }
+  .sort-hud-item { display: inline-flex; align-items: center; gap: 8px; }
+  .sort-hud-item strong { color: var(--color-graphite-heading); font-weight: 600; }
+
+  /* 게임 표면: 예약 높이로 안내/공백/상품 전환 시 레이아웃이 움직이지 않게 함 */
+  #jspsych-target {
+    background: var(--color-cloud-mist);
+    border-radius: var(--radius-cards);
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
   .jspsych-btn {
     font-family: var(--font-body);
     background: var(--color-volt-violet);
@@ -13,23 +52,68 @@
     border: none;
     border-radius: var(--radius-buttons);
   }
-  .sort-rule { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
-  .sort-item { width: 90px; height: 90px; margin: 0 auto; }
-  .sort-hint { margin-top: 16px; font-size: 13px; color: var(--color-steel-text); }
+
+  /* 시작 안내 — 두 기준과 대응을 색상·모양 범례로 명확히 */
+  .sort-instructions { text-align: center; padding: 8px 16px; }
+  .sort-instructions h2 { font-size: 22px; color: var(--color-midnight-ink); margin: 0 0 16px; }
+  .sort-legend { display: grid; gap: 12px; max-width: 420px; margin: 0 auto 20px; text-align: left; }
+  .sort-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+  }
+  .sort-legend-swatch { width: 22px; height: 22px; flex: 0 0 auto; }
+  .sort-legend-item strong { display: block; font-size: 15px; color: var(--color-graphite-heading); }
+  .sort-legend-item span { font-size: 13px; color: var(--color-steel-text); }
+  .sort-ready { color: var(--color-steel-text); font-size: 14px; margin: 0; }
+
+  /* 분류 기준 배지 — 현재 적용 중인 기준을 강조 */
+  .sort-stage { text-align: center; }
+  .sort-rule {
+    display: inline-block;
+    margin-bottom: 20px;
+    padding: 8px 18px;
+    border: 2px solid #000;
+    background: var(--color-canvas-white);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-graphite-heading);
+  }
+  .sort-item { width: 96px; height: 96px; margin: 0 auto; box-shadow: 0 0 0 5px rgba(0, 0, 0, .05); }
+  .sort-hint { margin-top: 18px; font-size: 13px; color: var(--color-steel-text); }
+
+  /* 결과 화면 */
+  .sort-thanks h2 { font-size: 24px; margin: 0 0 8px; }
+
+  @media (max-width: 560px) {
+    #jspsych-target { min-height: 300px; }
+  }
 </style>
 {% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
-    <h1 style="font-size: 24px;">전략게임 · 물류 분류센터 (3/9)</h1>
-    <p>{{ candidate_name }}님, 화면 위에 분류 기준("색상 기준" 또는 "모양 기준")이 표시됩니다. 기준에 따라 왼쪽 상품은 왼쪽 화살표, 오른쪽 상품은 오른쪽 화살표로 분류하세요. 기준은 예고 없이 바뀝니다.</p>
+<div class="sort-wrap">
+  <div id="startGate" class="card sort-start-card"{% if already_done %} style="display: none;"{% endif %}>
+    <span class="sort-eyebrow">STRATEGY GAME · 3/9</span>
+    <h1>물류 분류센터</h1>
+    <p class="sort-intro">{{ candidate_name }}님, 화면 위에 분류 기준("색상 기준" 또는 "모양 기준")이 표시됩니다. 기준에 따라 왼쪽 상품은 왼쪽 화살표, 오른쪽 상품은 오른쪽 화살표로 분류하세요. 기준은 예고 없이 바뀝니다.</p>
     <button id="startBtn" class="btn btn-primary">게임 시작</button>
   </div>
-  <div id="jspsych-target" style="display: none;"></div>
-  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+
+  <div id="playArea" style="display: none;">
+    <div class="sort-hud" role="note">
+      <span class="sort-hud-item"><strong>색상</strong> 파랑 ← · 노랑 →</span>
+      <span class="sort-hud-item"><strong>모양</strong> 동그라미 ← · 네모 →</span>
+    </div>
+    <div id="jspsych-target"></div>
+  </div>
+
+  <div id="thanksMsg" class="card sort-thanks"{% if not already_done %} style="display: none;"{% endif %}>
     <h2>완료</h2>
     <p>결과가 저장되었습니다. 감사합니다.</p>
-    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+    <p><a class="btn btn-ghost" href="{% url 'games:index' %}">전략게임 목록으로</a></p>
   </div>
 </div>
 {% endblock %}
@@ -41,7 +125,7 @@ const alreadyDone = {{ already_done|yesno:"true,false" }};
 
 if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
   document.getElementById('startGate').style.display = 'none';
-  document.getElementById('jspsych-target').style.display = 'block';
+  document.getElementById('playArea').style.display = 'block';
 
   const COLORS = ['#2f6fed', '#f5b301']; // 0=blue, 1=yellow
   const COLOR_KEYS = ['arrowleft', 'arrowright'];
@@ -115,7 +199,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
         body: JSON.stringify({ trials: trials, summary: summary }),
       }).then(function (r) {
         if (!r.ok && r.status !== 409) throw new Error('save failed');
-        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('playArea').style.display = 'none';
         document.getElementById('thanksMsg').style.display = 'block';
       }).catch(function () {
         alert('저장에 실패했습니다. 다시 시도해주세요.');
@@ -131,9 +215,16 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   timeline.push({
     type: jsPsychHtmlKeyboardResponse,
     stimulus:
-      '<p>"색상 기준"이 뜨면 파란 상품은 왼쪽 화살표, 노란 상품은 오른쪽 화살표.<br>' +
-      '"모양 기준"이 뜨면 동그란 상품은 왼쪽 화살표, 네모난 상품은 오른쪽 화살표.</p>' +
-      '<p>준비되면 스페이스바를 누르세요.</p>',
+      '<div class="sort-instructions">' +
+      '<h2>물류 분류센터</h2>' +
+      '<div class="sort-legend">' +
+      '<div class="sort-legend-item"><span class="sort-legend-swatch" style="background:#2f6fed;"></span>' +
+      '<div><strong>색상 기준</strong><span>파랑 ← 왼쪽 · 노랑 → 오른쪽</span></div></div>' +
+      '<div class="sort-legend-item"><span class="sort-legend-swatch" style="background:#2f6fed;border-radius:50%;"></span>' +
+      '<div><strong>모양 기준</strong><span>동그라미 ← 왼쪽 · 네모 → 오른쪽</span></div></div>' +
+      '</div>' +
+      '<p class="sort-ready">준비되면 스페이스바를 누르세요</p>' +
+      '</div>',
     choices: "ALL_KEYS",
   });
 
@@ -162,10 +253,12 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
       type: jsPsychHtmlKeyboardResponse,
       on_start: function () { progress.set(i + 1); },
       stimulus:
+        '<div class="sort-stage">' +
         '<div class="sort-rule">' + (rule === 'color' ? '색상 기준' : '모양 기준') + '</div>' +
         '<div class="sort-item" style="background:' + COLORS[colorIdx] + ';' +
         (shapeIdx === 0 ? 'border-radius:50%;' : 'border-radius:8px;') + '"></div>' +
-        '<div class="sort-hint">← 왼쪽 상품 / 오른쪽 상품 →</div>',
+        '<div class="sort-hint">← 왼쪽 상품 / 오른쪽 상품 →</div>' +
+        '</div>',
       choices: ['arrowleft', 'arrowright'],
       trial_duration: function () { return cueDuration; },
       data: {

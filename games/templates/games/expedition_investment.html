@@ -6,28 +6,119 @@
 <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
 <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
 <style>
-  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
-  .jspsych-btn {
+  /* 전략게임(탐사대 투자) 전용 스타일 — 다른 화면에 영향을 주지 않도록 .exp- 접두어 사용 */
+  .exp-wrap { max-width: 640px; margin: 40px auto 0; }
+
+  /* 시작 카드 */
+  .exp-eyebrow {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-fog-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .exp-start-card h1 { font-size: 28px; margin: 0 0 12px; }
+  .exp-intro { color: var(--color-slate-body); line-height: 1.6; margin: 0 0 20px; }
+
+  /* 지속 상태 영역(HUD): 목표 · 현재 자원을 게임 내내 고정 표시 */
+  .exp-status {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .exp-status-label { display: block; color: var(--color-fog-text); font-size: 12px; margin-bottom: 2px; }
+  .exp-status-value { color: var(--color-graphite-heading); font-size: 16px; font-weight: 600; }
+
+  /* 게임 표면: 예약 높이를 두어 선택(버튼)과 결과(텍스트) 사이 레이아웃이 움직이지 않게 함 */
+  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); min-height: 320px; }
+
+  /* 선택 안내 */
+  .exp-prompt { text-align: center; }
+  .exp-prompt h2 { font-size: 22px; color: var(--color-midnight-ink); margin: 0 0 6px; }
+  .exp-prompt p { margin: 0; color: var(--color-steel-text); font-size: 14px; }
+
+  /* 선택 버튼 — 지역을 정답처럼 보이지 않게 단조롭게 배치 */
+  .exp-choice {
     font-family: var(--font-body);
-    background: var(--color-volt-violet);
+    font-size: 16px;
+    font-weight: 700;
+    min-width: 96px;
+    min-height: 52px;
+    padding: 14px 20px;
     color: #000;
-    border: none;
+    background: var(--color-canvas-white);
+    border: 2px solid #000;
     border-radius: var(--radius-buttons);
+    cursor: pointer;
+  }
+  .exp-choice:hover { background: var(--color-lavender-wash); }
+  .exp-choice:focus-visible { outline: 3px solid var(--color-volt-violet); outline-offset: 2px; }
+
+  /* 결과 피드백 — 색상 외 부호·획득/손실 텍스트로도 구분 */
+  .exp-feedback { text-align: center; padding-top: 8px; }
+  .exp-feedback-tag { margin: 0 0 4px; color: var(--color-steel-text); font-size: 15px; }
+  .exp-feedback-amount {
+    display: block;
+    font-size: 40px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .exp-feedback-amount.exp-gain { color: #22a06b; }
+  .exp-feedback-amount.exp-loss { color: #e5484d; }
+  .exp-feedback-total { margin-top: 10px; color: var(--color-steel-text); font-size: 15px; }
+  .exp-feedback-total strong { color: var(--color-graphite-heading); font-size: 18px; font-variant-numeric: tabular-nums; }
+
+  .exp-wait { text-align: center; color: var(--color-steel-text); }
+
+  /* 결과 화면 */
+  .exp-thanks h2 { font-size: 24px; margin: 0 0 8px; }
+  .exp-final-line { color: var(--color-steel-text); margin: 8px 0 16px; }
+  .exp-final-line strong { color: var(--color-graphite-heading); font-size: 20px; font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 560px) {
+    .exp-status { grid-template-columns: 1fr; gap: 8px; }
+    .exp-choice { min-width: 0; width: 100%; }
+    #jspsych-target { min-height: 240px; }
   }
 </style>
 {% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
-    <h1 style="font-size: 24px;">전략게임 · 탐사대 투자 (9/9)</h1>
-    <p>{{ candidate_name }}님, A~D 네 곳의 탐사지역 중 하나를 반복해서 선택하세요. 각 지역의 정확한 확률은 알려드리지 않으며, 선택할 때마다 자원 증감 결과만 보여드립니다. 자원을 최대한 많이 모으는 것이 목표입니다.</p>
+<div class="exp-wrap">
+  <div id="startGate" class="card exp-start-card"{% if already_done %} style="display: none;"{% endif %}>
+    <span class="exp-eyebrow">STRATEGY GAME · 9/9</span>
+    <h1>탐사대 투자</h1>
+    <p class="exp-intro">{{ candidate_name }}님, A~D 네 곳의 탐사 지역 중 하나를 반복해서 선택하세요. 각 지역의 정확한 확률은 알려드리지 않으며, 선택할 때마다 자원 증감 결과만 보여드립니다. 자원을 최대한 많이 모으는 것이 목표입니다.</p>
     <button id="startBtn" class="btn btn-primary">게임 시작</button>
   </div>
-  <div id="jspsych-target" style="display: none;"></div>
-  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+
+  <div id="playArea" style="display: none;">
+    <div id="expStatus" class="exp-status" role="status" aria-live="polite">
+      <div>
+        <span class="exp-status-label">목표</span>
+        <span class="exp-status-value">자원 최대 수집</span>
+      </div>
+      <div>
+        <span class="exp-status-label">현재 자원</span>
+        <strong class="exp-status-value" id="expResource">0</strong>
+      </div>
+    </div>
+    <div id="jspsych-target"></div>
+  </div>
+
+  <div id="thanksMsg" class="card exp-thanks"{% if not already_done %} style="display: none;"{% endif %}>
     <h2>완료</h2>
     <p>결과가 저장되었습니다. 감사합니다.</p>
-    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+    <p class="exp-final-line">모은 자원: <strong id="expFinal">-</strong></p>
+    <p><a class="btn btn-ghost" href="{% url 'games:index' %}">전략게임 목록으로</a></p>
   </div>
 </div>
 {% endblock %}
@@ -40,7 +131,7 @@ const alreadyDone = {{ already_done|yesno:"true,false" }};
 
 if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
   document.getElementById('startGate').style.display = 'none';
-  document.getElementById('jspsych-target').style.display = 'block';
+  document.getElementById('playArea').style.display = 'block';
 
   function mean(values) {
     return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
@@ -71,6 +162,11 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   let lastOutcome = null;
   const N_ROUNDS = 50; // must match EXPEDITION_TRIALS in games/views.py
   const progress = createGameProgress(document.getElementById('jspsych-target'), N_ROUNDS);
+
+  function refreshResource() {
+    document.getElementById('expResource').textContent = String(runningTotal);
+  }
+  refreshResource();
 
   const jsPsych = initJsPsych({
     display_element: 'jspsych-target',
@@ -178,7 +274,8 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
         body: JSON.stringify({ trials: choiceTrials, summary: summary }),
       }).then(function (r) {
         if (!r.ok && r.status !== 409) throw new Error('save failed');
-        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('playArea').style.display = 'none';
+        document.getElementById('expFinal').textContent = String(runningTotal);
         document.getElementById('thanksMsg').style.display = 'block';
       }).catch(function () {
         alert('저장에 실패했습니다. 다시 시도해주세요.');
@@ -192,10 +289,15 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     return {
       type: jsPsychHtmlKeyboardResponse,
       stimulus: function () {
-        const color = lastOutcome.amount >= 0 ? '#22a06b' : '#e5484d';
-        const sign = lastOutcome.amount >= 0 ? '+' : '';
-        return '<p>' + lastOutcome.deck + ' 지역 결과: <span style="color:' + color + ';font-weight:700;">' +
-          sign + lastOutcome.amount + '</span></p><p>누적 자원: ' + runningTotal + '</p>';
+        const isGain = lastOutcome.amount >= 0;
+        const cls = isGain ? 'exp-gain' : 'exp-loss';
+        const sign = isGain ? '+' : '';
+        const word = isGain ? '획득' : '손실';
+        return '<div class="exp-feedback">' +
+          '<p class="exp-feedback-tag">' + lastOutcome.deck + ' 지역 결과 · ' + word + '</p>' +
+          '<span class="exp-feedback-amount ' + cls + '">' + sign + lastOutcome.amount + '</span>' +
+          '<p class="exp-feedback-total">누적 자원 <strong>' + runningTotal + '</strong></p>' +
+          '</div>';
       },
       choices: 'NO_KEYS',
       trial_duration: 1200,
@@ -213,14 +315,18 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     return {
       type: jsPsychHtmlButtonResponse,
       on_start: function () { progress.set(i + 1); },
-      stimulus: function () { return '<p>누적 자원: ' + runningTotal + '</p><p>탐사할 지역을 선택하세요.</p>'; },
+      stimulus: function () {
+        return '<div class="exp-prompt"><h2>탐사할 지역을 선택하세요</h2><p>선택한 지역의 자원 증감 결과가 곧 표시됩니다.</p></div>';
+      },
       choices: ['A 지역', 'B 지역', 'C 지역', 'D 지역'],
+      button_html: '<button class="exp-choice">%choice%</button>',
       data: { trial_stage: 'choice', trial_index: i },
       on_finish: function (data) {
         const deckLetter = DECK_LETTERS[Number(data.response)];
         resolveDeck(deckLetter).then(function (result) {
           runningTotal = result.running_total;
           lastOutcome = { deck: result.deck, amount: result.amount };
+          refreshResource();
 
           data.deck = result.deck;
           data.amount = result.amount;
@@ -239,17 +345,12 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   function waitTrial() {
     return {
       type: jsPsychHtmlKeyboardResponse,
-      stimulus: function () { return '<p>누적 자원: ' + runningTotal + '</p><p>결과를 확인하는 중...</p>'; },
+      stimulus: function () { return '<div class="exp-wait">결과를 확인하는 중...</div>'; },
       choices: 'NO_KEYS',
     };
   }
 
   const timeline = [];
-  timeline.push({
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: '<p>A, B, C, D 네 지역 중 하나를 반복해서 선택하며 자원을 최대한 모으세요.<br>확률은 알려드리지 않습니다.</p><p>준비되면 스페이스바를 누르세요.</p>',
-    choices: "ALL_KEYS",
-  });
   for (let i = 0; i < N_ROUNDS; i++) {
     timeline.push(choiceTrial(i));
     timeline.push(waitTrial());

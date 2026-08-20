@@ -5,7 +5,49 @@
 <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
 <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
 <style>
-  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
+  /* 전략게임(긴급 제동) 전용 스타일 — 다른 화면에 영향을 주지 않도록 .brake- 접두어 사용 */
+  .brake-wrap { max-width: 640px; margin: 40px auto 0; }
+
+  /* 시작 카드 */
+  .brake-eyebrow {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-fog-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .brake-start-card h1 { font-size: 28px; margin: 0 0 12px; }
+  .brake-intro { color: var(--color-slate-body); line-height: 1.6; margin: 0 0 20px; }
+
+  /* 지속 상태 영역: 게임 내내 규칙을 조용히 상기시킴 */
+  .brake-hud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+    font-size: 13px;
+    color: var(--color-steel-text);
+  }
+  .brake-hud-item { display: inline-flex; align-items: center; gap: 8px; }
+  .brake-hud-item strong { color: var(--color-graphite-heading); font-weight: 600; }
+  .brake-hud-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  .brake-hud-dot.go { background: #22a06b; }
+  .brake-hud-dot.stop { background: #e5484d; }
+
+  /* 게임 표면: 예약 높이로 안내/공백/상자 전환 시 레이아웃이 움직이지 않게 함 */
+  #jspsych-target {
+    background: var(--color-cloud-mist);
+    border-radius: var(--radius-cards);
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
   .jspsych-btn {
     font-family: var(--font-body);
     background: var(--color-volt-violet);
@@ -13,24 +55,70 @@
     border: none;
     border-radius: var(--radius-buttons);
   }
-  .brake-box { width: 140px; height: 90px; margin: 0 auto; border-radius: 8px; background: #22a06b; border: 4px solid transparent; }
+
+  /* 시작 안내 — 승인/정지 두 규칙을 색상 범례로 명확히 */
+  .brake-instructions { text-align: center; padding: 8px 16px; }
+  .brake-instructions h2 { font-size: 22px; color: var(--color-midnight-ink); margin: 0 0 16px; }
+  .brake-legend { display: grid; gap: 12px; max-width: 400px; margin: 0 auto 20px; text-align: left; }
+  .brake-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+  }
+  .brake-legend-dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
+  .brake-legend-dot.go { background: #22a06b; }
+  .brake-legend-dot.stop { background: #e5484d; }
+  .brake-legend-item strong { display: block; font-size: 15px; color: var(--color-graphite-heading); }
+  .brake-legend-item span { font-size: 13px; color: var(--color-steel-text); }
+  .brake-ready { color: var(--color-steel-text); font-size: 14px; margin: 0; }
+
+  /* 승인 상자 — 초록(승인)이 기본, 정지 신호 시 빨강으로 전환 */
+  .brake-stage { text-align: center; }
+  .brake-box {
+    width: 150px;
+    height: 96px;
+    margin: 0 auto;
+    border-radius: 8px;
+    background: #22a06b;
+    border: 4px solid transparent;
+    box-shadow: 0 0 0 5px rgba(34, 160, 107, .14);
+  }
   .brake-box.stop-armed { animation: stopSignalReveal 0.01s linear forwards; }
-  @keyframes stopSignalReveal { to { background: #e5484d; border-color: #7a1f22; } }
+  @keyframes stopSignalReveal { to { background: #e5484d; border-color: #7a1f22; box-shadow: 0 0 0 5px rgba(229, 72, 77, .16); } }
   .brake-label { margin-top: 16px; font-size: 14px; color: var(--color-steel-text); }
+
+  /* 결과 화면 */
+  .brake-thanks h2 { font-size: 24px; margin: 0 0 8px; }
+
+  @media (max-width: 560px) {
+    #jspsych-target { min-height: 280px; }
+  }
 </style>
 {% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
-    <h1 style="font-size: 24px;">전략게임 · 긴급 제동 (2/9)</h1>
-    <p>{{ candidate_name }}님, 제품이 나오면 최대한 빨리 스페이스바로 승인하세요. 단, 승인하기 전에 상자가 빨갛게 바뀌며 정지 신호가 뜨면 절대 누르지 마세요. 반응 속도와 억제 조절 능력을 함께 측정합니다.</p>
+<div class="brake-wrap">
+  <div id="startGate" class="card brake-start-card"{% if already_done %} style="display: none;"{% endif %}>
+    <span class="brake-eyebrow">STRATEGY GAME · 2/9</span>
+    <h1>긴급 제동</h1>
+    <p class="brake-intro">{{ candidate_name }}님, 제품이 나오면 최대한 빨리 스페이스바로 승인하세요. 단, 승인하기 전에 상자가 빨갛게 바뀌며 정지 신호가 뜨면 절대 누르지 마세요. 반응 속도와 억제 조절 능력을 함께 측정합니다.</p>
     <button id="startBtn" class="btn btn-primary">게임 시작</button>
   </div>
-  <div id="jspsych-target" style="display: none;"></div>
-  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+
+  <div id="playArea" style="display: none;">
+    <div class="brake-hud" role="note">
+      <span class="brake-hud-item"><span class="brake-hud-dot go"></span>초록 상자 → <strong>스페이스바(승인)</strong></span>
+      <span class="brake-hud-item"><span class="brake-hud-dot stop"></span>빨강으로 바뀌면 → <strong>즉시 멈춤</strong></span>
+    </div>
+    <div id="jspsych-target"></div>
+  </div>
+
+  <div id="thanksMsg" class="card brake-thanks"{% if not already_done %} style="display: none;"{% endif %}>
     <h2>완료</h2>
     <p>결과가 저장되었습니다. 감사합니다.</p>
-    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+    <p><a class="btn btn-ghost" href="{% url 'games:index' %}">전략게임 목록으로</a></p>
   </div>
 </div>
 {% endblock %}
@@ -42,7 +130,7 @@ const alreadyDone = {{ already_done|yesno:"true,false" }};
 
 if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
   document.getElementById('startGate').style.display = 'none';
-  document.getElementById('jspsych-target').style.display = 'block';
+  document.getElementById('playArea').style.display = 'block';
 
   // ---- Stop-Signal Delay staircase ----
   // ponytail: fixed step/bounds heuristic tuned to converge stop-success near 50%,
@@ -121,7 +209,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
         body: JSON.stringify({ trials: gameTrials, summary: summary }),
       }).then(function (r) {
         if (!r.ok && r.status !== 409) throw new Error('save failed');
-        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('playArea').style.display = 'none';
         document.getElementById('thanksMsg').style.display = 'block';
       }).catch(function () {
         alert('저장에 실패했습니다. 다시 시도해주세요.');
@@ -142,9 +230,16 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   timeline.push({
     type: jsPsychHtmlKeyboardResponse,
     stimulus:
-      '<p>제품이 나오면 최대한 빨리 스페이스바를 눌러 승인하세요.<br>' +
-      '상자가 빨갛게 바뀌며 정지 신호가 뜨면 절대 누르지 마세요.</p>' +
-      '<p>준비되면 스페이스바를 누르세요.</p>',
+      '<div class="brake-instructions">' +
+      '<h2>긴급 제동</h2>' +
+      '<div class="brake-legend">' +
+      '<div class="brake-legend-item"><span class="brake-legend-dot go"></span>' +
+      '<div><strong>초록 상자</strong><span>나오면 최대한 빨리 스페이스바로 승인하세요</span></div></div>' +
+      '<div class="brake-legend-item"><span class="brake-legend-dot stop"></span>' +
+      '<div><strong>상자가 빨강으로 바뀌면</strong><span>정지 신호입니다. 절대 누르지 마세요</span></div></div>' +
+      '</div>' +
+      '<p class="brake-ready">준비되면 스페이스바를 누르세요</p>' +
+      '</div>',
     choices: "ALL_KEYS",
   });
 
@@ -165,10 +260,10 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
       on_start: function () { progress.set(index + 1); },
       stimulus: function () {
         if (stage !== 'stop') {
-          return '<div class="brake-box"></div><div class="brake-label">승인 대기 중</div>';
+          return '<div class="brake-stage"><div class="brake-box"></div><div class="brake-label">승인 대기 중</div></div>';
         }
-        return '<div class="brake-box stop-armed" style="animation-delay: ' + ssd + 'ms;"></div>' +
-          '<div class="brake-label">승인 대기 중</div>';
+        return '<div class="brake-stage"><div class="brake-box stop-armed" style="animation-delay: ' + ssd + 'ms;"></div>' +
+          '<div class="brake-label">승인 대기 중</div></div>';
       },
       choices: "ALL_KEYS",
       trial_duration: RESPONSE_WINDOW_MS,

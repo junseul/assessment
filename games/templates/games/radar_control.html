@@ -6,33 +6,141 @@
 <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
 <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
 <style>
-  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
-  .jspsych-btn {
-    font-family: var(--font-body);
-    background: var(--color-volt-violet);
-    color: #000;
-    border: none;
-    border-radius: var(--radius-buttons);
+  /* 전략게임(레이더 관제) 전용 스타일 — 다른 화면에 영향을 주지 않도록 .radar- 접두어 사용 */
+  .radar-wrap { max-width: 640px; margin: 40px auto 0; }
+
+  /* 시작 카드 */
+  .radar-eyebrow {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-fog-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
   }
-  .radar-aircraft { display: grid; width: 120px; height: 100px; margin: 0 auto; place-items: center; border: 2px solid; border-radius: 12px; }
-  .radar-aircraft img { width: 104px; height: 84px; object-fit: contain; }
-  .radar-aircraft.normal { border-color: #22a06b; background: #e8f6ee; }
-  .radar-aircraft.danger { border-color: #e5484d; background: #fdecec; }
-  .radar-label { margin-top: 16px; font-size: 14px; color: var(--color-steel-text); }
+  .radar-start-card h1 { font-size: 28px; margin: 0 0 12px; }
+  .radar-intro { color: var(--color-slate-body); line-height: 1.6; margin: 0 0 20px; }
+
+  /* 지속 상태 영역: 게임 내내 규칙을 조용히 상기시킴 (시각적 큐가 아닌 상시 안내) */
+  .radar-hud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+    font-size: 13px;
+    color: var(--color-steel-text);
+  }
+  .radar-hud-item { display: inline-flex; align-items: center; gap: 8px; }
+  .radar-hud-item strong { color: var(--color-graphite-heading); font-weight: 600; }
+  .radar-hud-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  .radar-hud-dot.normal { background: #22a06b; }
+  .radar-hud-dot.danger { background: #e5484d; }
+
+  /* 게임 표면: 예약 높이로 안내/공백/비행체 전환 시 레이아웃이 움직이지 않게 함 */
+  #jspsych-target {
+    background: var(--color-cloud-mist);
+    border-radius: var(--radius-cards);
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  /* 시작 안내 — 두 규칙을 색상 범례로 명확히 */
+  .radar-instructions { text-align: center; padding: 8px 16px; }
+  .radar-instructions h2 { font-size: 22px; color: var(--color-midnight-ink); margin: 0 0 16px; }
+  .radar-legend { display: grid; gap: 12px; max-width: 380px; margin: 0 auto 20px; text-align: left; }
+  .radar-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+  }
+  .radar-legend-dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
+  .radar-legend-dot.normal { background: #22a06b; }
+  .radar-legend-dot.danger { background: #e5484d; }
+  .radar-legend-item strong { display: block; font-size: 15px; color: var(--color-graphite-heading); }
+  .radar-legend-item span { font-size: 13px; color: var(--color-steel-text); }
+  .radar-ready { color: var(--color-steel-text); font-size: 14px; margin: 0; }
+
+  /* 레이더 스코프 — 원형 화면에 비행체를 표적으로 표시, 초록/빨강이 1차 신호 */
+  .radar-stage { text-align: center; }
+  .radar-scope {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    margin: 0 auto;
+    border-radius: 50%;
+    background: var(--color-canvas-white);
+    border: 2px solid var(--color-mist-border);
+    overflow: hidden;
+  }
+  .radar-ring { position: absolute; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .07); }
+  .radar-ring-1 { inset: 20%; }
+  .radar-ring-2 { inset: 7%; }
+  .radar-cross { position: absolute; inset: 0; }
+  .radar-cross::before, .radar-cross::after { content: ''; position: absolute; background: rgba(0, 0, 0, .06); }
+  .radar-cross::before { left: 50%; top: 0; width: 1px; height: 100%; }
+  .radar-cross::after { top: 50%; left: 0; height: 1px; width: 100%; }
+  .radar-target {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+  }
+  .radar-target img { width: 66px; height: 66px; object-fit: contain; }
+  .radar-target.normal { background: #e8f6ee; border: 3px solid #22a06b; box-shadow: 0 0 0 5px rgba(34, 160, 107, .14); }
+  .radar-target.danger { background: #fdecec; border: 3px solid #e5484d; box-shadow: 0 0 0 5px rgba(229, 72, 77, .14); }
+
+  /* 표적 라벨 */
+  .radar-label { margin-top: 16px; font-size: 15px; color: var(--color-steel-text); display: inline-flex; align-items: center; gap: 8px; }
+  .radar-label-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .radar-label.normal .radar-label-dot { background: #22a06b; }
+  .radar-label.danger .radar-label-dot { background: #e5484d; }
+
+  /* 결과 화면 */
+  .radar-thanks h2 { font-size: 24px; margin: 0 0 8px; }
+
+  @media (max-width: 560px) {
+    .radar-scope { width: 200px; height: 200px; }
+    .radar-target { width: 92px; height: 92px; }
+    .radar-target img { width: 56px; height: 56px; }
+    #jspsych-target { min-height: 300px; }
+  }
 </style>
 {% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
-    <h1 style="font-size: 24px;">전략게임 · 레이더 관제 (1/9)</h1>
-    <p>{{ candidate_name }}님, 레이더에 비행체가 계속 나타납니다. 일반 비행체(초록)에는 스페이스바를 누르고, 위험 비행체(빨강)에는 아무것도 누르지 마세요. 반응 속도와 주의 유지 능력을 측정합니다.</p>
+<div class="radar-wrap">
+  <div id="startGate" class="card radar-start-card"{% if already_done %} style="display: none;"{% endif %}>
+    <span class="radar-eyebrow">STRATEGY GAME · 1/9</span>
+    <h1>레이더 관제</h1>
+    <p class="radar-intro">{{ candidate_name }}님, 레이더에 비행체가 계속 나타납니다. 일반 비행체(초록)에는 스페이스바를 누르고, 위험 비행체(빨강)에는 아무것도 누르지 마세요. 반응 속도와 주의 유지 능력을 측정합니다.</p>
     <button id="startBtn" class="btn btn-primary">게임 시작</button>
   </div>
-  <div id="jspsych-target" style="display: none;"></div>
-  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+
+  <div id="playArea" style="display: none;">
+    <div class="radar-hud" role="note">
+      <span class="radar-hud-item"><span class="radar-hud-dot normal"></span>초록 비행체 → <strong>스페이스바</strong></span>
+      <span class="radar-hud-item"><span class="radar-hud-dot danger"></span>빨강 비행체 → <strong>기다림</strong></span>
+    </div>
+    <div id="jspsych-target"></div>
+  </div>
+
+  <div id="thanksMsg" class="card radar-thanks"{% if not already_done %} style="display: none;"{% endif %}>
     <h2>완료</h2>
     <p>결과가 저장되었습니다. 감사합니다.</p>
-    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+    <p><a class="btn btn-ghost" href="{% url 'games:index' %}">전략게임 목록으로</a></p>
   </div>
 </div>
 {% endblock %}
@@ -46,7 +154,7 @@ const dangerAircraftUrl = "{% static 'images/games/aircraft-danger.svg' %}";
 
 if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
   document.getElementById('startGate').style.display = 'none';
-  document.getElementById('jspsych-target').style.display = 'block';
+  document.getElementById('playArea').style.display = 'block';
 
   // ---- adaptive difficulty state ----
   // ponytail: fixed step/threshold heuristic, not a tuned psychometric model.
@@ -135,7 +243,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
         body: JSON.stringify({ trials: gameTrials, summary: summary }),
       }).then(function (r) {
         if (!r.ok && r.status !== 409) throw new Error('save failed');
-        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('playArea').style.display = 'none';
         document.getElementById('thanksMsg').style.display = 'block';
       }).catch(function () {
         alert('저장에 실패했습니다. 다시 시도해주세요.');
@@ -156,9 +264,16 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   timeline.push({
     type: jsPsychHtmlKeyboardResponse,
     stimulus:
-      '<p>일반 비행체(초록)가 나오면 최대한 빨리 스페이스바를 누르세요.<br>' +
-      '위험 비행체(빨강)가 나오면 아무것도 누르지 마세요.</p>' +
-      '<p>준비되면 스페이스바를 누르세요.</p>',
+      '<div class="radar-instructions">' +
+      '<h2>레이더 관제</h2>' +
+      '<div class="radar-legend">' +
+      '<div class="radar-legend-item"><span class="radar-legend-dot normal"></span>' +
+      '<div><strong>일반 비행체 (초록)</strong><span>나오면 최대한 빨리 스페이스바를 누르세요</span></div></div>' +
+      '<div class="radar-legend-item"><span class="radar-legend-dot danger"></span>' +
+      '<div><strong>위험 비행체 (빨강)</strong><span>나오면 아무것도 누르지 마세요</span></div></div>' +
+      '</div>' +
+      '<p class="radar-ready">준비되면 스페이스바를 누르세요</p>' +
+      '</div>',
     choices: "ALL_KEYS",
   });
 
@@ -177,8 +292,15 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
       type: jsPsychHtmlKeyboardResponse,
       on_start: function () { progress.set(index + 1); },
       stimulus:
-        '<div class="radar-aircraft ' + aircraftClass + '"><img src="' + aircraftUrl + '" alt="" aria-hidden="true"></div>' +
-        '<div class="radar-label">' + label + '</div>',
+        '<div class="radar-stage">' +
+        '<div class="radar-scope">' +
+        '<div class="radar-ring radar-ring-2"></div>' +
+        '<div class="radar-ring radar-ring-1"></div>' +
+        '<div class="radar-cross"></div>' +
+        '<div class="radar-target ' + aircraftClass + '"><img src="' + aircraftUrl + '" alt="" aria-hidden="true"></div>' +
+        '</div>' +
+        '<div class="radar-label ' + aircraftClass + '"><span class="radar-label-dot"></span>' + label + '</div>' +
+        '</div>',
       choices: "ALL_KEYS",
       trial_duration: function () { return stimDuration; },
       data: { trial_stage: stage },

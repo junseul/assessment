@@ -2,35 +2,105 @@
 {% block title %}전략게임: 우주기지 일정관리{% endblock %}
 {% block extra_head %}
 <style>
-  #ssArena { background: var(--color-cloud-mist); border-radius: var(--radius-cards); padding: 40px 24px; text-align: center; min-height: 220px; }
-  #ssStim { font-size: 48px; font-weight: 700; min-height: 60px; color: var(--color-graphite-heading); }
-  #ssHint { margin-top: 12px; font-size: 13px; color: var(--color-steel-text); }
-  #ssClockRow { margin-top: 20px; }
-  #clockDisplay { margin-left: 12px; font-family: var(--font-mono); font-size: 14px; }
+  /* 전략게임(우주기지 일정관리) 전용 스타일 — 다른 화면에 영향을 주지 않도록 .ss- 접두어 사용 */
+  .ss-wrap { max-width: 640px; margin: 40px auto 0; }
+
+  /* 시작 카드 */
+  .ss-eyebrow {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-fog-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .ss-start-card h1 { font-size: 28px; margin: 0 0 12px; }
+  .ss-intro { color: var(--color-slate-body); line-height: 1.6; margin: 0 0 12px; }
+  .ss-promises {
+    margin: 0 0 20px;
+    padding: 14px 16px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-cloud-mist);
+    font-size: 14px;
+    color: var(--color-slate-body);
+    line-height: 1.7;
+  }
+  .ss-promises strong { color: var(--color-graphite-heading); }
+
+  /* 게임 표면 */
+  #jspsych-target { background: transparent; }
+  #ssArena {
+    background: var(--color-cloud-mist);
+    border-radius: var(--radius-cards);
+    padding: 32px 24px;
+    text-align: center;
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  #ssStim { font-size: 56px; font-weight: 700; min-height: 72px; line-height: 1; color: var(--color-graphite-heading); font-variant-numeric: tabular-nums; }
+
+  /* 지속 상태 영역: 점검 규칙과 약속 이행을 게임 내내 조용히 상기시킴 */
+  #ssHint {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 18px;
+    margin-top: 20px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+    font-size: 13px;
+    color: var(--color-steel-text);
+  }
+  #ssHint span { display: inline-flex; align-items: center; gap: 6px; }
+  #ssHint strong { color: var(--color-graphite-heading); font-weight: 600; }
+
+  #ssClockRow { margin-top: 16px; display: flex; align-items: center; justify-content: center; }
+  #clockDisplay { margin-left: 12px; font-family: var(--font-mono); font-size: 14px; min-height: 1em; color: var(--color-graphite-heading); }
+
+  /* 결과 화면 */
+  .ss-thanks h2 { font-size: 24px; margin: 0 0 8px; }
+
+  @media (max-width: 560px) {
+    #ssStim { font-size: 44px; min-height: 56px; }
+    #ssArena { min-height: 200px; }
+  }
 </style>
 {% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
-    <h1 style="font-size: 24px;">전략게임 · 우주기지 일정관리 (7/9)</h1>
-    <p>{{ candidate_name }}님, 화면에 나오는 숫자가 홀수면 왼쪽 화살표, 짝수면 오른쪽 화살표를 누르는 점검 업무를 계속하세요.</p>
-    <p><strong>단, 두 가지를 기억하세요:</strong> ① 별(★)이 나타나면 P키를 누르세요. ② 시작 후 약 2분, 약 4분이 지나면 P키를 누르세요. 경과 시간은 "시간 확인" 버튼으로 볼 수 있습니다.</p>
+<div class="ss-wrap">
+  <div id="startGate" class="card ss-start-card"{% if already_done %} style="display: none;"{% endif %}>
+    <span class="ss-eyebrow">STRATEGY GAME · 7/9</span>
+    <h1>우주기지 일정관리</h1>
+    <p class="ss-intro">{{ candidate_name }}님, 화면에 나오는 숫자가 홀수면 왼쪽 화살표, 짝수면 오른쪽 화살표를 누르는 점검 업무를 계속하세요.</p>
+    <p class="ss-promises"><strong>단, 두 가지를 기억하세요:</strong> ① 별(★)이 나타나면 P키를 누르세요. ② 시작 후 약 2분, 약 4분이 지나면 P키를 누르세요. 경과 시간은 "시간 확인" 버튼으로 볼 수 있습니다.</p>
     <button id="startBtn" class="btn btn-primary">게임 시작</button>
   </div>
-  <div id="jspsych-target" style="display: none;">
-    <div id="ssArena">
-      <div id="ssStim"></div>
-      <div id="ssHint">홀수: ← / 짝수: → / 약속 이행: P</div>
-      <div id="ssClockRow">
-        <button id="clockCheckBtn" class="btn btn-ghost">시간 확인</button>
-        <span id="clockDisplay"></span>
+
+  <div id="playArea" style="display: none;">
+    <div id="jspsych-target">
+      <div id="ssArena">
+        <div id="ssStim"></div>
+        <div id="ssHint">
+          <span>홀수 <strong>←</strong></span>
+          <span>짝수 <strong>→</strong></span>
+          <span>★·약속 <strong>P</strong></span>
+        </div>
+        <div id="ssClockRow">
+          <button id="clockCheckBtn" class="btn btn-ghost">시간 확인</button>
+          <span id="clockDisplay"></span>
+        </div>
       </div>
     </div>
   </div>
-  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+
+  <div id="thanksMsg" class="card ss-thanks"{% if not already_done %} style="display: none;"{% endif %}>
     <h2>완료</h2>
     <p>결과가 저장되었습니다. 감사합니다.</p>
-    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+    <p><a class="btn btn-ghost" href="{% url 'games:index' %}">전략게임 목록으로</a></p>
   </div>
 </div>
 {% endblock %}
@@ -44,7 +114,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
 
 function runGame() {
   document.getElementById('startGate').style.display = 'none';
-  document.getElementById('jspsych-target').style.display = 'block';
+  document.getElementById('playArea').style.display = 'block';
 
   const stimEl = document.getElementById('ssStim');
   const clockDisplay = document.getElementById('clockDisplay');
@@ -200,7 +270,7 @@ function runGame() {
       body: JSON.stringify({ trials: trials, summary: summary }),
     }).then(function (r) {
       if (!r.ok && r.status !== 409) throw new Error('save failed');
-      document.getElementById('jspsych-target').style.display = 'none';
+      document.getElementById('playArea').style.display = 'none';
       document.getElementById('thanksMsg').style.display = 'block';
     }).catch(function () {
       alert('저장에 실패했습니다. 다시 시도해주세요.');

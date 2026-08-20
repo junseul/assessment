@@ -6,7 +6,50 @@
 <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
 <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
 <style>
-  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
+  /* 전략게임(순간 통신) 전용 스타일 — 다른 화면에 영향을 주지 않도록 .fc- 접두어 사용 */
+  .fc-wrap { max-width: 640px; margin: 40px auto 0; }
+
+  /* 시작 카드 */
+  .fc-eyebrow {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-fog-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .fc-start-card h1 { font-size: 28px; margin: 0 0 12px; }
+  .fc-intro { color: var(--color-slate-body); line-height: 1.6; margin: 0 0 20px; }
+
+  /* 지속 상태 영역: 기억할 두 신호를 게임 내내 조용히 상기시킴 */
+  .fc-hud {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 24px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+    font-size: 13px;
+    color: var(--color-steel-text);
+  }
+  .fc-hud-item { display: inline-flex; align-items: center; gap: 8px; }
+  .fc-hud-item strong { color: var(--color-graphite-heading); font-weight: 600; }
+  .fc-hud-swatch { width: 12px; height: 12px; flex: 0 0 auto; }
+  .fc-hud-swatch.t1 { background: #2f6fed; border-radius: 50%; }
+  .fc-hud-swatch.t2 { background: #111111; border-radius: 2px; }
+
+  /* 게임 표면: 예약 높이로 신호/질문 전환 시 레이아웃이 움직이지 않게 함 */
+  #jspsych-target {
+    background: var(--color-cloud-mist);
+    border-radius: var(--radius-cards);
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
   .jspsych-btn {
     font-family: var(--font-body);
     background: var(--color-volt-violet);
@@ -14,22 +57,50 @@
     border: none;
     border-radius: var(--radius-buttons);
   }
-  .rsvp-item { width: 60px; height: 60px; margin: 0 auto; }
+
+  /* 시작 안내 */
+  .fc-instructions { text-align: center; padding: 8px 16px; }
+  .fc-instructions h2 { font-size: 22px; color: var(--color-midnight-ink); margin: 0 0 12px; }
+  .fc-instructions p { color: var(--color-steel-text); font-size: 14px; margin: 0 0 8px; }
+  .fc-ready { color: var(--color-steel-text); font-size: 14px; margin: 12px 0 0; }
+
+  /* 신호 표시 — 빠르게 지나가는 단일 신호 */
+  .rsvp-item { width: 64px; height: 64px; margin: 0 auto; }
   .rsvp-item.filler { background: #c0c5cc; border-radius: 6px; }
+
+  /* 질문 — 두 신호에 대한 회상 */
+  .fc-question { text-align: center; }
+  .fc-question p { color: var(--color-graphite-heading); font-size: 18px; font-weight: 600; margin: 0 0 20px; }
+
+  /* 결과 화면 */
+  .fc-thanks h2 { font-size: 24px; margin: 0 0 8px; }
+
+  @media (max-width: 560px) {
+    #jspsych-target { min-height: 240px; }
+  }
 </style>
 {% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
-    <h1 style="font-size: 24px;">전략게임 · 순간 통신 (8/9)</h1>
-    <p>{{ candidate_name }}님, 회색 신호가 빠르게 연속으로 지나갑니다. 그 사이에 색깔 있는 원(첫 번째 신호)과 검은 도형(두 번째 신호)이 섞여 나옵니다. 각 신호가 끝나면 무엇을 보았는지 물어봅니다.</p>
+<div class="fc-wrap">
+  <div id="startGate" class="card fc-start-card"{% if already_done %} style="display: none;"{% endif %}>
+    <span class="fc-eyebrow">STRATEGY GAME · 8/9</span>
+    <h1>순간 통신</h1>
+    <p class="fc-intro">{{ candidate_name }}님, 회색 신호가 빠르게 연속으로 지나갑니다. 그 사이에 색깔 있는 원(첫 번째 신호)과 검은 도형(두 번째 신호)이 섞여 나옵니다. 각 신호가 끝나면 무엇을 보았는지 물어봅니다.</p>
     <button id="startBtn" class="btn btn-primary">게임 시작</button>
   </div>
-  <div id="jspsych-target" style="display: none;"></div>
-  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+
+  <div id="playArea" style="display: none;">
+    <div class="fc-hud" role="note">
+      <span class="fc-hud-item"><span class="fc-hud-swatch t1"></span><strong>첫 번째 신호</strong> 색깔 원</span>
+      <span class="fc-hud-item"><span class="fc-hud-swatch t2"></span><strong>두 번째 신호</strong> 검은 도형</span>
+    </div>
+    <div id="jspsych-target"></div>
+  </div>
+
+  <div id="thanksMsg" class="card fc-thanks"{% if not already_done %} style="display: none;"{% endif %}>
     <h2>완료</h2>
     <p>결과가 저장되었습니다. 감사합니다.</p>
-    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+    <p><a class="btn btn-ghost" href="{% url 'games:index' %}">전략게임 목록으로</a></p>
   </div>
 </div>
 {% endblock %}
@@ -41,7 +112,7 @@ const alreadyDone = {{ already_done|yesno:"true,false" }};
 
 if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
   document.getElementById('startGate').style.display = 'none';
-  document.getElementById('jspsych-target').style.display = 'block';
+  document.getElementById('playArea').style.display = 'block';
 
   function mean(values) {
     return values.length ? values.reduce(function (a, b) { return a + b; }, 0) / values.length : null;
@@ -94,7 +165,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
         body: JSON.stringify({ trials: seqResults, summary: summary }),
       }).then(function (r) {
         if (!r.ok && r.status !== 409) throw new Error('save failed');
-        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('playArea').style.display = 'none';
         document.getElementById('thanksMsg').style.display = 'block';
       }).catch(function () {
         alert('저장에 실패했습니다. 다시 시도해주세요.');
@@ -114,7 +185,13 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   const timeline = [];
   timeline.push({
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: '<p>회색 신호가 빠르게 지나가는 중 색깔 원과 검은 도형이 섞여 나옵니다.<br>각 회차가 끝나면 두 가지를 물어봅니다.</p><p>준비되면 스페이스바를 누르세요.</p>',
+    stimulus:
+      '<div class="fc-instructions">' +
+      '<h2>순간 통신</h2>' +
+      '<p>회색 신호가 빠르게 지나가는 중 색깔 원과 검은 도형이 섞여 나옵니다.</p>' +
+      '<p>각 회차가 끝나면 두 가지를 물어봅니다.</p>' +
+      '<p class="fc-ready">준비되면 스페이스바를 누르세요</p>' +
+      '</div>',
     choices: "ALL_KEYS",
   });
 
@@ -161,7 +238,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     const correctQ1Index = t1IsBlue ? 0 : 1;
     timeline.push({
       type: jsPsychHtmlButtonResponse,
-      stimulus: '<p>방금 첫 번째 신호(원)는 무슨 색이었나요?</p>',
+      stimulus: '<div class="fc-question"><p>방금 첫 번째 신호(원)는 무슨 색이었나요?</p></div>',
       choices: ['파란색', '주황색'],
       data: { trial_stage: 't1_question', seq: seqIdx, lag: lag },
       on_finish: function (data) { data.correct = Number(data.response) === correctQ1Index; },
@@ -170,7 +247,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     const correctQ2Index = t2IsCircle ? 0 : 1;
     timeline.push({
       type: jsPsychHtmlButtonResponse,
-      stimulus: '<p>두 번째 신호(검은 도형)는 어떤 모양이었나요?</p>',
+      stimulus: '<div class="fc-question"><p>두 번째 신호(검은 도형)는 어떤 모양이었나요?</p></div>',
       choices: ['원', '네모'],
       data: { trial_stage: 't2_question', seq: seqIdx, lag: lag },
       on_finish: function (data) { data.correct = Number(data.response) === correctQ2Index; },

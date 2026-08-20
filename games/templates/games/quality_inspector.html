@@ -5,7 +5,57 @@
 <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
 <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
 <style>
-  #jspsych-target { background: var(--color-cloud-mist); border-radius: var(--radius-cards); }
+  /* 전략게임(품질검사관) 전용 스타일 — 다른 화면에 영향을 주지 않도록 .qi- 접두어 사용 */
+  .qi-wrap { max-width: 640px; margin: 40px auto 0; }
+
+  /* 시작 카드 */
+  .qi-eyebrow {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-fog-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .qi-start-card h1 { font-size: 28px; margin: 0 0 12px; }
+  .qi-intro { color: var(--color-slate-body); line-height: 1.6; margin: 0 0 20px; }
+
+  /* 지속 상태 영역: F/J 대응을 게임 내내 조용히 상기시킴 */
+  .qi-hud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+    font-size: 13px;
+    color: var(--color-steel-text);
+  }
+  .qi-hud-item { display: inline-flex; align-items: center; gap: 8px; }
+  .qi-hud-item strong { color: var(--color-graphite-heading); font-weight: 600; }
+  .qi-hud-key {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid #000;
+    background: var(--color-canvas-white);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-graphite-heading);
+  }
+
+  /* 게임 표면: 예약 높이로 안내/공백/부품 묶음 전환 시 레이아웃이 움직이지 않게 함 */
+  #jspsych-target {
+    background: var(--color-cloud-mist);
+    border-radius: var(--radius-cards);
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
   .jspsych-btn {
     font-family: var(--font-body);
     background: var(--color-volt-violet);
@@ -13,24 +63,72 @@
     border: none;
     border-radius: var(--radius-buttons);
   }
-  .search-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 480px; margin: 0 auto; }
+
+  /* 시작 안내 — F/J 대응을 명확히 */
+  .qi-instructions { text-align: center; padding: 8px 16px; }
+  .qi-instructions h2 { font-size: 22px; color: var(--color-midnight-ink); margin: 0 0 16px; }
+  .qi-legend { display: grid; gap: 12px; max-width: 400px; margin: 0 auto 20px; text-align: left; }
+  .qi-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-mist-border);
+    background: var(--color-canvas-white);
+  }
+  .qi-legend-key {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    border: 2px solid #000;
+    background: var(--color-canvas-white);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-graphite-heading);
+  }
+  .qi-legend-item strong { display: block; font-size: 15px; color: var(--color-graphite-heading); }
+  .qi-legend-item span { font-size: 13px; color: var(--color-steel-text); }
+  .qi-ready { color: var(--color-steel-text); font-size: 14px; margin: 0; }
+
+  /* 부품 묶음 — 정상 부품(파랑)과 불량품(노랑, 회전) */
+  .qi-stage { text-align: center; }
+  .search-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 480px; margin: 0 auto; padding: 16px; border: 1px solid var(--color-mist-border); background: var(--color-canvas-white); }
   .search-item { width: 28px; height: 28px; border-radius: 6px; background: #2f6fed; }
   .search-item.odd { background: #f5b301; transform: rotate(45deg); }
-  .search-hint { margin-top: 20px; font-size: 13px; color: var(--color-steel-text); }
+  .search-hint { margin-top: 18px; font-size: 13px; color: var(--color-steel-text); }
+
+  /* 결과 화면 */
+  .qi-thanks h2 { font-size: 24px; margin: 0 0 8px; }
+
+  @media (max-width: 560px) {
+    #jspsych-target { min-height: 280px; }
+    .search-grid { gap: 8px; padding: 12px; }
+  }
 </style>
 {% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
-    <h1 style="font-size: 24px;">전략게임 · 품질검사관 (4/9)</h1>
-    <p>{{ candidate_name }}님, 화면에 부품 묶음이 나타납니다. 다른 색으로 돌아간 불량품이 있으면 F, 없으면 J를 최대한 빨리 누르세요.</p>
+<div class="qi-wrap">
+  <div id="startGate" class="card qi-start-card"{% if already_done %} style="display: none;"{% endif %}>
+    <span class="qi-eyebrow">STRATEGY GAME · 4/9</span>
+    <h1>품질검사관</h1>
+    <p class="qi-intro">{{ candidate_name }}님, 화면에 부품 묶음이 나타납니다. 다른 색으로 돌아간 불량품이 있으면 F, 없으면 J를 최대한 빨리 누르세요.</p>
     <button id="startBtn" class="btn btn-primary">게임 시작</button>
   </div>
-  <div id="jspsych-target" style="display: none;"></div>
-  <div id="thanksMsg" class="card"{% if not already_done %} style="display: none;"{% endif %}>
+
+  <div id="playArea" style="display: none;">
+    <div class="qi-hud" role="note">
+      <span class="qi-hud-item"><span class="qi-hud-key">F</span>불량품 있음</span>
+      <span class="qi-hud-item"><span class="qi-hud-key">J</span>불량품 없음</span>
+    </div>
+    <div id="jspsych-target"></div>
+  </div>
+
+  <div id="thanksMsg" class="card qi-thanks"{% if not already_done %} style="display: none;"{% endif %}>
     <h2>완료</h2>
     <p>결과가 저장되었습니다. 감사합니다.</p>
-    <p><a href="{% url 'games:index' %}">전략게임 목록으로</a></p>
+    <p><a class="btn btn-ghost" href="{% url 'games:index' %}">전략게임 목록으로</a></p>
   </div>
 </div>
 {% endblock %}
@@ -42,18 +140,18 @@ const alreadyDone = {{ already_done|yesno:"true,false" }};
 
 if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', function () {
   document.getElementById('startGate').style.display = 'none';
-  document.getElementById('jspsych-target').style.display = 'block';
+  document.getElementById('playArea').style.display = 'block';
 
   // Present/absent detection variant of visual search (Treisman-style), rather
   // than click-to-localize: keeps the response binary and keyboard-based, and
   // still yields Search RT / Accuracy / False Alarm / Miss / set-size slope.
   function buildGrid(setSize, hasTarget) {
     const targetPos = hasTarget ? Math.floor(Math.random() * setSize) : -1;
-    let html = '<div class="search-grid">';
+    let html = '<div class="qi-stage"><div class="search-grid">';
     for (let i = 0; i < setSize; i++) {
       html += '<div class="search-item' + (i === targetPos ? ' odd' : '') + '"></div>';
     }
-    html += '</div><div class="search-hint">불량품이 있으면 F, 없으면 J</div>';
+    html += '</div><div class="search-hint">불량품이 있으면 F, 없으면 J</div></div>';
     return html;
   }
 
@@ -113,7 +211,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
         body: JSON.stringify({ trials: trials, summary: summary }),
       }).then(function (r) {
         if (!r.ok && r.status !== 409) throw new Error('save failed');
-        document.getElementById('jspsych-target').style.display = 'none';
+        document.getElementById('playArea').style.display = 'none';
         document.getElementById('thanksMsg').style.display = 'block';
       }).catch(function () {
         alert('저장에 실패했습니다. 다시 시도해주세요.');
@@ -130,7 +228,17 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   const timeline = [];
   timeline.push({
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: '<p>부품 묶음 속에 색이 다른 불량품이 있으면 F, 없으면 J를 누르세요.</p><p>준비되면 스페이스바를 누르세요.</p>',
+    stimulus:
+      '<div class="qi-instructions">' +
+      '<h2>품질검사관</h2>' +
+      '<div class="qi-legend">' +
+      '<div class="qi-legend-item"><span class="qi-legend-key">F</span>' +
+      '<div><strong>불량품이 있으면</strong><span>다른 색으로 돌아간 부품이 보이면 F</span></div></div>' +
+      '<div class="qi-legend-item"><span class="qi-legend-key">J</span>' +
+      '<div><strong>불량품이 없으면</strong><span>모두 같은 색이면 J</span></div></div>' +
+      '</div>' +
+      '<p class="qi-ready">준비되면 스페이스바를 누르세요</p>' +
+      '</div>',
     choices: "ALL_KEYS",
   });
 

@@ -20,7 +20,34 @@
     text-transform: uppercase;
   }
   .fc-start-card h1 { font-size: 28px; margin: 0 0 12px; }
-  .fc-intro { color: var(--color-slate-body); line-height: 1.6; margin: 0 0 20px; }
+  .fc-intro { color: var(--color-slate-body); line-height: 1.6; margin: 0 0 16px; }
+
+  /* 신호 안내 범례 — 시작 카드와 인스트럭션에서 재사용 */
+  .fc-legend { margin: 0 0 20px; }
+  .fc-legend-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-fog-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+  .fc-legend-items { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fc-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-mist-border);
+    border-radius: var(--radius-cards);
+    background: var(--color-canvas-white);
+    color: var(--color-slate-body);
+    font-size: 13px;
+  }
+  .fc-legend-item strong { color: var(--color-graphite-heading); font-weight: 700; }
+  .fc-dot { width: 22px; height: 22px; flex: 0 0 auto; display: inline-block; }
+  .fc-dot.circle { border-radius: 50%; }
+  .fc-dot.square { border-radius: 5px; }
 
   /* 지속 상태 영역: 기억할 두 신호를 게임 내내 조용히 상기시킴 */
   .fc-hud {
@@ -50,21 +77,15 @@
     flex-direction: column;
     justify-content: center;
   }
-  .jspsych-btn {
-    font-family: var(--font-body);
-    background: var(--color-volt-violet);
-    color: #000;
-    border: none;
-    border-radius: var(--radius-buttons);
-  }
 
   /* 시작 안내 */
   .fc-instructions { text-align: center; padding: 8px 16px; }
   .fc-instructions h2 { font-size: 22px; color: var(--color-midnight-ink); margin: 0 0 12px; }
   .fc-instructions p { color: var(--color-steel-text); font-size: 14px; margin: 0 0 8px; }
+  .fc-instructions .fc-legend { display: inline-flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; text-align: left; }
   .fc-ready { color: var(--color-steel-text); font-size: 14px; margin: 12px 0 0; }
 
-  /* 신호 표시 — 빠르게 지나가는 단일 신호 */
+  /* 신호 표시 — 빠르게 지나가는 단일 신호 (크기·색·지속시간은 측정 무결성을 위해 그대로 유지) */
   .rsvp-item { width: 64px; height: 64px; margin: 0 auto; }
   .rsvp-item.filler { background: #c0c5cc; border-radius: 6px; }
 
@@ -72,11 +93,35 @@
   .fc-question { text-align: center; }
   .fc-question p { color: var(--color-graphite-heading); font-size: 18px; font-weight: 600; margin: 0 0 20px; }
 
+  /* 답변 버튼 — 보기마다 색깔/모양 스와치로 명확하게 */
+  .fc-opt {
+    font-family: var(--font-body);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-width: 140px;
+    padding: 14px 22px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-graphite-heading);
+    background: var(--color-canvas-white);
+    border: 2px solid var(--color-mist-border);
+    border-radius: var(--radius-buttons);
+    cursor: pointer;
+  }
+  .fc-opt:hover { border-color: var(--color-graphite-heading); background: var(--color-lavender-wash); }
+  .fc-opt:focus-visible { outline: 3px solid var(--color-volt-violet); outline-offset: 2px; }
+  .fc-opt-swatch, .fc-opt-shape { width: 20px; height: 20px; flex: 0 0 auto; display: inline-block; }
+  .fc-opt-swatch.circle, .fc-opt-shape.circle { border-radius: 50%; }
+  .fc-opt-shape.square { border-radius: 4px; }
+
   /* 결과 화면 */
   .fc-thanks h2 { font-size: 24px; margin: 0 0 8px; }
 
   @media (max-width: 560px) {
     #jspsych-target { min-height: 240px; }
+    .fc-opt { min-width: 0; width: 100%; }
   }
 </style>
 {% endblock %}
@@ -85,7 +130,14 @@
   <div id="startGate" class="card fc-start-card"{% if already_done %} style="display: none;"{% endif %}>
     <span class="fc-eyebrow">STRATEGY GAME · 8/9</span>
     <h1>순간 통신</h1>
-    <p class="fc-intro">{{ candidate_name }}님, 회색 신호가 빠르게 연속으로 지나갑니다. 그 사이에 색깔 있는 원(첫 번째 신호)과 검은 도형(두 번째 신호)이 섞여 나옵니다. 각 신호가 끝나면 무엇을 보았는지 물어봅니다.</p>
+    <p class="fc-intro">{{ candidate_name }}님, 회색 신호가 빠르게 연속으로 지나갑니다. 그 사이에 색깔 있는 원과 검은 도형이 한 번씩 나타나니 잘 기억하세요. 각 회차가 끝나면 본 것을 물어봅니다.</p>
+    <div class="fc-legend" role="note">
+      <span class="fc-legend-label">신호 안내</span>
+      <div class="fc-legend-items">
+        <span class="fc-legend-item"><span class="fc-dot circle" style="background:#2f6fed;"></span><strong>첫 번째 신호</strong> 색깔 원 · 파랑 또는 주황</span>
+        <span class="fc-legend-item"><span class="fc-dot circle" style="background:#111111;"></span><span class="fc-dot square" style="background:#111111;"></span><strong>두 번째 신호</strong> 검은 도형 · 원 또는 네모</span>
+      </div>
+    </div>
     <button id="startBtn" class="btn btn-primary">게임 시작</button>
   </div>
 
@@ -188,8 +240,12 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     stimulus:
       '<div class="fc-instructions">' +
       '<h2>순간 통신</h2>' +
-      '<p>회색 신호가 빠르게 지나가는 중 색깔 원과 검은 도형이 섞여 나옵니다.</p>' +
-      '<p>각 회차가 끝나면 두 가지를 물어봅니다.</p>' +
+      '<p>회색 신호가 빠르게 연속으로 지나갑니다. 그 사이에 두 신호가 나타납니다.</p>' +
+      '<div class="fc-legend">' +
+      '<span class="fc-legend-item"><span class="fc-dot circle" style="background:#2f6fed;"></span><strong>첫 번째</strong> 색깔 원</span>' +
+      '<span class="fc-legend-item"><span class="fc-dot circle" style="background:#111111;"></span><span class="fc-dot square" style="background:#111111;"></span><strong>두 번째</strong> 검은 도형</span>' +
+      '</div>' +
+      '<p>각 회차가 끝나면 <strong>첫 번째 신호의 색</strong>과 <strong>두 번째 신호의 모양</strong>을 물어봅니다.</p>' +
       '<p class="fc-ready">준비되면 스페이스바를 누르세요</p>' +
       '</div>',
     choices: "ALL_KEYS",
@@ -240,6 +296,10 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
       type: jsPsychHtmlButtonResponse,
       stimulus: '<div class="fc-question"><p>방금 첫 번째 신호(원)는 무슨 색이었나요?</p></div>',
       choices: ['파란색', '주황색'],
+      button_html: [
+        '<button class="fc-opt"><span class="fc-opt-swatch circle" style="background:#2f6fed;"></span>파란색</button>',
+        '<button class="fc-opt"><span class="fc-opt-swatch circle" style="background:#f5a623;"></span>주황색</button>',
+      ],
       data: { trial_stage: 't1_question', seq: seqIdx, lag: lag },
       on_finish: function (data) { data.correct = Number(data.response) === correctQ1Index; },
     });
@@ -249,6 +309,10 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
       type: jsPsychHtmlButtonResponse,
       stimulus: '<div class="fc-question"><p>두 번째 신호(검은 도형)는 어떤 모양이었나요?</p></div>',
       choices: ['원', '네모'],
+      button_html: [
+        '<button class="fc-opt"><span class="fc-opt-shape circle" style="background:#111111;"></span>원</button>',
+        '<button class="fc-opt"><span class="fc-opt-shape square" style="background:#111111;"></span>네모</button>',
+      ],
       data: { trial_stage: 't2_question', seq: seqIdx, lag: lag },
       on_finish: function (data) { data.correct = Number(data.response) === correctQ2Index; },
     });

@@ -7,6 +7,7 @@ from django.test import Client
 
 from helpers import login_candidate
 
+from .catalog import GAMES
 from .models import GameResult
 
 
@@ -90,17 +91,27 @@ class GameSubmitTests(TestCase):
         response = self.client.get(reverse('games:play', args=[self.slug]))
         self.assertEqual(response.headers.get('X-Frame-Options'), 'SAMEORIGIN')
 
-    def test_index_lists_all_nine_games_as_playable(self):
+    def test_index_redirects_to_first_unfinished_game(self):
         response = self.client.get(reverse('games:index'))
-        self.assertEqual(response.status_code, 200)
-        for title in [
-            '레이더 관제', '긴급 제동', '물류 분류센터', '우주기지 일정관리', '드론 추적',
-            '품질검사관', '암호 연구소', '순간 통신', '탐사대 투자',
-        ]:
-            self.assertContains(response, title)
-        self.assertNotContains(response, '준비중')
-        self.assertContains(response, '시작하기', count=9)
-        self.assertContains(response, 'class="game-select-card"', count=9)
+        self.assertRedirects(response, reverse('games:play', args=['radar-control']))
+
+    def test_index_advances_to_next_game_in_order(self):
+        GameResult.objects.create(
+            candidate=self.candidate, game_slug='radar-control',
+            respondent_email=self.candidate.email, trials=[], summary={},
+        )
+        response = self.client.get(reverse('games:index'))
+        self.assertRedirects(response, reverse('games:play', args=['emergency-brake']))
+
+    def test_index_redirects_to_start_when_all_games_done(self):
+        for game in GAMES:
+            if game['implemented']:
+                GameResult.objects.create(
+                    candidate=self.candidate, game_slug=game['slug'],
+                    respondent_email=self.candidate.email, trials=[], summary={},
+                )
+        response = self.client.get(reverse('games:index'))
+        self.assertRedirects(response, reverse('invites:start'), fetch_redirect_response=False)
 
     def test_every_game_exposes_progress_information(self):
         expected_lengths = {

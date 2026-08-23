@@ -1,22 +1,52 @@
-{% extends "base.html" %}
-{% block title %}지원자 목록{% endblock %}
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+{% block title %}지원자 리포트{% endblock %}
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'admin/css/changelists.css' %}">
+  <link rel="stylesheet" href="{% static 'admin/css/responsive.css' %}">
+{% endblock %}
+{% block breadcrumbs %}
+  <div class="breadcrumbs"><a href="{% url 'admin:index' %}">홈</a> &rsaquo; 지원자 리포트</div>
+{% endblock %}
+{% block content_title %}<h1>지원자 리포트</h1>{% endblock %}
 {% block content %}
-<div style="margin-top: 40px;">
-  <h1>지원자 목록</h1>
-  <p>{{ candidates|length }}명의 지원자가 하나 이상의 모듈을 완료했습니다.</p>
-
-  <div class="card" style="padding: 8px 16px;">
-    <ul class="candidate-list">
-      {% for c in candidates %}
-        <li>
-          <a href="{% url 'reports:candidate_detail' c.pk %}">
-            {% if c.name %}{{ c.name }} · {% endif %}{{ c.email }}
-          </a>
-        </li>
-      {% empty %}
-        <li style="padding: 16px 4px; color: var(--color-fog-text);">아직 응시한 지원자가 없습니다.</li>
-      {% endfor %}
-    </ul>
+<div id="content-main">
+  <div class="module filtered" id="changelist">
+    <div class="changelist-form-container">
+      <div class="results">
+        <table id="result_list">
+          <thead>
+            <tr>
+              <th scope="col" class="column-name">
+                <div class="text"><span>이름</span></div>
+                <div class="clear"></div>
+              </th>
+              <th scope="col" class="column-email">
+                <div class="text"><span>이메일</span></div>
+                <div class="clear"></div>
+              </th>
+              <th scope="col" class="column-created_at">
+                <div class="text"><span>등록일</span></div>
+                <div class="clear"></div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in candidates %}
+              <tr>
+                <th class="field-name"><a href="{% url 'reports:candidate_detail' c.pk %}">{% if c.name %}{{ c.name }}{% else %}-{% endif %}</a></th>
+                <td class="field-email">{{ c.email }}</td>
+                <td class="field-created_at nowrap">{{ c.created_at }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3">아직 응시한 지원자가 없습니다.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="paginator">총 {{ candidates|length }}명</p>
+    </div>
   </div>
 </div>
 {% endblock %}

@@ -1,0 +1,142 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block form_top %}
+{% if change and original %}
+<div class="survey-result">
+  <div class="survey-result-header">
+    <div class="eyebrow">성향파악 · 설문 결과</div>
+    <h2 class="survey-result-title">{{ original.survey.title }}</h2>
+    <p class="survey-result-meta">
+      {% if original.candidate %}<strong>{{ original.candidate.name }}</strong> · {% endif %}{{ original.respondent_email }}
+      <span class="survey-result-sep">·</span> {{ original.created_at|date:"Y-m-d H:i" }}
+    </p>
+  </div>
+
+  {% if not has_domain_answers %}
+  <div class="survey-panel survey-note">
+    저장된 답변이 현재 170문항 설문 형식과 일치하지 않아 도메인 점수는 산출할 수 없습니다. (하단에 원시 답변 데이터를 확인하세요)
+  </div>
+  {% endif %}
+
+  {% if has_domain_answers %}
+  <div class="survey-stat-grid">
+    <div class="survey-stat">
+      <span>응답 완료</span>
+      <strong>{{ quality.answered|default_if_none:"-" }}/170</strong>
+    </div>
+    <div class="survey-stat">
+      <span>타임아웃</span>
+      <strong>{{ quality.timed_out|default_if_none:"-" }}</strong>
+    </div>
+    <div class="survey-stat">
+      <span>평균 응답시간</span>
+      <strong>{{ quality.avg_rt_ms|default_if_none:"-" }}<small>ms</small></strong>
+    </div>
+    <div class="survey-stat">
+      <span>속응답 비율(1.5초 미만)</span>
+      <strong>{{ quality.fast_response_pct|floatformat:1|default_if_none:"-" }}<small>%</small></strong>
+    </div>
+    <div class="survey-stat">
+      <span>극단응답 비율</span>
+      <strong>{{ quality.extreme_response_pct|floatformat:1|default_if_none:"-" }}<small>%</small></strong>
+    </div>
+    <div class="survey-stat">
+      <span>동일응답 최대 연속</span>
+      <strong>{{ quality.max_same_answer_streak|default_if_none:"-" }}</strong>
+    </div>
+  </div>
+
+  <div class="survey-panel survey-domains">
+    <h3>도메인별 점수</h3>
+    {% for d in domain_scores %}
+    <div class="survey-domain-row">
+      <div class="survey-domain-label">{{ d.label }}</div>
+      <div class="survey-domain-track">
+        <div class="survey-domain-fill{% if d.score is not None and d.score >= 60 %} is-high{% elif d.score is not None and d.score <= 40 %} is-low{% endif %}"
+             style="width: {{ d.score|default_if_none:0 }}%"></div>
+      </div>
+      <div class="survey-domain-score">
+        {% if d.score is not None %}<strong>{{ d.score|floatformat:0 }}</strong>점{% else %}-{% endif %}
+        <span>{{ d.answered }}문항</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="survey-panel survey-answers">
+    <h3>문항별 답변</h3>
+    {% for domain in domains_detail %}
+    <details class="survey-answer-group"{% if forloop.first %} open{% endif %}>
+      <summary>{{ domain.label }} <span class="survey-answer-count">{{ domain.items|length }}문항</span></summary>
+      <table class="survey-answer-table">
+        <thead>
+          <tr><th>#</th><th>문항</th><th>답변</th><th>응답시간</th></tr>
+        </thead>
+        <tbody>
+          {% for item in domain.items %}
+          <tr>
+            <td class="survey-answer-no">
+              {{ item.number }}
+              {% if item.reversed %}<span class="survey-rev" title="역문항">R</span>{% endif %}
+            </td>
+            <td class="survey-answer-text">{{ item.text }}</td>
+            <td>
+              {% if item.detail %}
+                <span class="survey-answer-value">{{ item.detail.value }}</span>
+                <span class="survey-answer-label">{{ item.detail.value_label }}</span>
+                {% if item.detail.timed_out %}<span class="survey-badge survey-badge-warn">타임아웃</span>{% endif %}
+              {% else %}
+                <span class="survey-answer-empty">미응답</span>
+              {% endif %}
+            </td>
+            <td class="survey-answer-rt">{% if item.detail.rt_ms %}{{ item.detail.rt_ms }}<small>ms</small>{% else %}-{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="survey-panel survey-answers">
+    <h3>문항별 답변</h3>
+    <table class="survey-answer-table">
+      <thead>
+        <tr><th>문항</th><th>답변</th></tr>
+      </thead>
+      <tbody>
+        {% for item in generic_answers %}
+        <tr>
+          <td class="survey-answer-text">{{ item.key }}</td>
+          <td>
+            {% if item.value is not None %}
+              <span class="survey-answer-value">{{ item.value }}</span>
+              <span class="survey-answer-label">{{ item.value_label }}</span>
+            {% else %}
+              <span class="survey-answer-label">{{ item.value_label }}</span>
+            {% endif %}
+            {% if item.timed_out %}<span class="survey-badge survey-badge-warn">타임아웃</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block field_sets %}
+{% for fieldset in adminform %}
+  {% if fieldset.name == '답변' %}
+    <details class="survey-raw-json" open>
+      <summary>원시 답변 데이터 (JSON)</summary>
+      {% include "admin/includes/fieldset.html" with heading_level=2 prefix="fieldset" id_prefix=0 id_suffix=forloop.counter0 %}
+    </details>
+  {% else %}
+    {% include "admin/includes/fieldset.html" with heading_level=2 prefix="fieldset" id_prefix=0 id_suffix=forloop.counter0 %}
+  {% endif %}
+{% endfor %}
+{% endblock %}

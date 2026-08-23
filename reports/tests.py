@@ -27,7 +27,12 @@ class AdminDashboardTests(TestCase):
         self.assertContains(response, '성향파악')
         self.assertContains(response, '전략게임')
         self.assertContains(response, '면접응답')
-        self.assertContains(response, '<a href="http://127.0.0.1:8000/reports/">지원자 목록</a>', html=True)
+        # 결과 분석 카테고리 + 지원자 리포트 링크 (전체 결과 조회)
+        self.assertContains(response, '결과 분석')
+        self.assertContains(response, '지원자 리포트')
+        self.assertContains(response, reverse('reports:candidate_list'))
+        # 우측 상단 유저링크에서 '지원자 목록' 링크가 제거되어야 한다.
+        self.assertNotContains(response, '>지원자 목록</a>')
         self.assertNotContains(response, '사이트 보기')
         self.assertContains(response, '지원자')
         self.assertContains(response, '초대 링크')
@@ -63,6 +68,42 @@ class AdminDashboardTests(TestCase):
         Invite.objects.create(candidate=candidate)
         invite_response = self.client.get('/admin/invites/invite/')
         self.assertContains(invite_response, 'status-badge')
+
+    def test_sidebar_menu_order(self):
+        import re
+        response = self.client.get('/admin/')
+        body = response.content.decode('utf-8')
+        m = re.search(r'<nav[^>]*id="nav-sidebar".*?</nav>', body, re.S)
+        self.assertIsNotNone(m)
+        side = m.group(0)
+
+        anchors = [
+            '/admin/auth/" class="section"',
+            '/admin/invites/" class="section"',
+            '/admin/traits/" class="section"',
+            '/admin/games/" class="section"',
+            '/admin/interviews/" class="section"',
+            '결과 분석',
+            'local-test-menu',
+        ]
+        positions = [side.find(a) for a in anchors]
+        for anchor, pos in zip(anchors, positions):
+            self.assertGreaterEqual(pos, 0, f'{anchor} 이(가) 사이드바에 없습니다')
+        self.assertEqual(positions, sorted(positions), f'메뉴 순서가 잘못되었습니다: {positions}')
+
+    def test_changelist_titles_use_korean_model_names(self):
+        cases = [
+            ('/admin/invites/candidate/', '변경할 지원자 선택'),
+            ('/admin/invites/invite/', '변경할 초대 링크 선택'),
+            ('/admin/traits/survey/', '변경할 설문 선택'),
+            ('/admin/traits/surveyresponse/', '변경할 설문 응답 선택'),
+            ('/admin/games/gameresult/', '변경할 게임 결과 선택'),
+            ('/admin/interviews/interviewresponse/', '변경할 면접 응답 선택'),
+        ]
+        for url, title in cases:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, f'<h1>{title}</h1>')
 
 
 class RootRedirectTests(TestCase):
@@ -140,9 +181,11 @@ class ReportTests(TestCase):
         )
         self.client.login(username='hr', password='pass')
         response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
-        self.assertContains(response, '<dt>최종 자원</dt><dd>0</dd>', html=True)
-        self.assertContains(response, '<dt>탐색 비율</dt><dd>0.0</dd>', html=True)
-        self.assertContains(response, '<dt>손실추격 지수</dt><dd>0.0</dd>', html=True)
+        self.assertContains(response, '<label>최종 자원:</label>')
+        self.assertContains(response, '<div class="readonly">0</div>', count=1)
+        self.assertContains(response, '<div class="readonly">0.0</div>', count=2)
+        # setUp's plain go-nogo result must still use the generic accuracy block.
+        self.assertContains(response, '정확한 반응 억제')
 
     def test_zero_survey_score_renders_as_zero_not_dash(self):
         survey = Survey.objects.create(title='역량 설문', schema={})
@@ -153,6 +196,96 @@ class ReportTests(TestCase):
         self.client.login(username='hr', password='pass')
         response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
         self.assertContains(response, '0.0 / 100')
+
+    def test_radar_metrics_render(self):
+        GameResult.objects.create(
+            candidate=self.candidate, game_slug='radar-control',
+            respondent_email=self.candidate.email, trials=[],
+            summary={'accuracy': 0.85, 'mean_rt_ms': 320, 'n_trials': 70},
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        self.assertContains(response, '<label>정확도:</label>')
+        self.assertContains(response, '<div class="readonly">0.85</div>')
+        self.assertContains(response, '<div class="readonly">320</div>')
+        self.assertContains(response, '<div class="readonly">70</div>')
+        self.assertContains(response, '대체로 안정적')
+        # 완료 현황: 9개 게임 각각의 상태 — 완료한 게임만 '완료', 나머지는 '미완료'
+        self.assertContains(response, '<label>전략게임 · 레이더 관제:</label>')
+        self.assertContains(response, '<label>전략게임 · 긴급 제동:</label>')
+        self.assertContains(response, '<div class="readonly">미완료</div>')
+
+    def test_emergency_brake_metrics_render(self):
+        GameResult.objects.create(
+            candidate=self.candidate, game_slug='emergency-brake',
+            respondent_email=self.candidate.email, trials=[],
+            summary={'mean_go_rt_ms': 280, 'stop_success_rate': 0.9, 'n_trials': 70},
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        self.assertContains(response, '<label>GO 평균 반응시간(ms):</label>')
+        self.assertContains(response, '<div class="readonly">280</div>')
+        self.assertContains(response, '<div class="readonly">0.9</div>')
+        self.assertContains(response, '<div class="readonly">70</div>')
+        self.assertContains(response, '억제 성공률 높음')
+
+    def test_space_station_metrics_render_with_trial_count(self):
+        trials = [
+            {'trial_stage': 'ongoing'},
+            {'trial_stage': 'ongoing'},
+            {'trial_stage': 'event_pm'},
+        ]
+        GameResult.objects.create(
+            candidate=self.candidate, game_slug='space-station-schedule',
+            respondent_email=self.candidate.email, trials=trials,
+            summary={'ongoing_accuracy': 0.8, 'ongoing_mean_rt_ms': 410},
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        self.assertContains(response, '<label>점검 정확도:</label>')
+        self.assertContains(response, '<div class="readonly">0.8</div>')
+        self.assertContains(response, '<div class="readonly">410</div>')
+        self.assertContains(response, '<div class="readonly">2</div>')
+        self.assertContains(response, '점검 정확도 보통')
+
+    def test_flash_comm_metrics_render(self):
+        GameResult.objects.create(
+            candidate=self.candidate, game_slug='flash-comm',
+            respondent_email=self.candidate.email, trials=[],
+            summary={'t1_accuracy': 0.8, 't2_accuracy': 0.6, 'n_sequences': 24},
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        self.assertContains(response, '<label>첫 번째 신호 정확도:</label>')
+        self.assertContains(response, '<div class="readonly">0.8</div>')
+        self.assertContains(response, '<div class="readonly">24</div>')
+        self.assertContains(response, '신호 회상 정확도 보통')
+
+    def test_zero_metric_renders_as_zero_not_dash(self):
+        GameResult.objects.create(
+            candidate=self.candidate, game_slug='radar-control',
+            respondent_email=self.candidate.email, trials=[],
+            summary={
+                'accuracy': 0, 'mean_rt_ms': 0, 'rt_sd_ms': 0,
+                'omission_error_rate': 0, 'commission_error_rate': 0, 'n_trials': 0,
+            },
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        # 레이더 지표 6개가 모두 0으로 채워져 있으므로 6건 모두 '0'으로 렌더링된다
+        self.assertContains(response, '<div class="readonly">0</div>', count=6)
+        self.assertNotContains(response, '<div class="readonly">-</div>')
+
+    def test_missing_metric_renders_as_dash(self):
+        GameResult.objects.create(
+            candidate=self.candidate, game_slug='radar-control',
+            respondent_email=self.candidate.email, trials=[],
+            summary={'accuracy': 0.9},
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        # 레이더 지표 6개 중 summary에 없는 5개(평균반응시간 제외 accuracy만 있음)가 '-'로 표시된다
+        self.assertContains(response, '<div class="readonly">-</div>', count=5)
 
     def test_logout_rejects_get(self):
         self.client.login(username='hr', password='pass')

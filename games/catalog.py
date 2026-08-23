@@ -85,3 +85,16 @@ GAMES = [
 
 def get_game(slug):
     return next((g for g in GAMES if g['slug'] == slug), None)
+
+
+def next_game_slug(done_slugs):
+    """카탈로그 순서대로 첫 번째 미완료 게임의 slug. 모두 완료면 None."""
+    for game in GAMES:
+        if game['implemented'] and game['slug'] not in done_slugs:
+            return game['slug']
+    return None
+
+
+def all_games_done(done_slugs):
+    """구현된 9개 게임이 모두 완료됐는지 여부."""
+    return all(game['slug'] in done_slugs for game in GAMES if game['implemented'])

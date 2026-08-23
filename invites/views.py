@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin.views.decorators import staff_member_required
@@ -6,6 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 
+from games.catalog import all_games_done
 from games.models import GameResult
 from interviews.models import InterviewResponse
 from traits.models import Survey, SurveyResponse
@@ -20,9 +23,19 @@ def local_test(request, stage):
     if not settings.DEBUG:
         raise Http404
 
-    candidate = Candidate.objects.order_by('-created_at').first()
-    if candidate is None:
-        raise Http404('테스트할 지원자가 없습니다.')
+    # 로컬 테스트는 접속자(로그인한 관리자) 본인 명의로 진행한다. 실지원자
+    # 데이터를 건드리지 않도록, 관리자 username 기반의 전용 테스트 후보를
+    # 사용해 같은 관리자의 결과가 한 후보 아래에 누적되게 한다.
+    username = request.user.username
+    display_name = request.user.get_full_name() or request.user.username
+    test_email = f'local-test-{username}@example.com'
+    candidate, created = Candidate.objects.get_or_create(
+        email=test_email,
+        defaults={'name': display_name, 'birthdate': date(2000, 1, 1), 'phone': '0000000000'},
+    )
+    if not created and candidate.name != display_name:
+        candidate.name = display_name
+        candidate.save(update_fields=['name'])
     request.session['candidate_id'] = candidate.pk
     request.session['candidate_name'] = candidate.name
     request.session['candidate_email'] = candidate.email
@@ -50,6 +63,11 @@ def local_test(request, stage):
         **admin.site.each_context(request),
         'title': title,
         'iframe_src': iframe_src,
+        'tester': {
+            'name': candidate.name,
+            'email': candidate.email,
+            'report_url': reverse('reports:candidate_detail', args=[candidate.pk]),
+        },
     })
 
 
@@ -95,7 +113,10 @@ def start(request):
         survey_done = SurveyResponse.objects.filter(survey=survey, candidate=request.candidate).exists()
     else:
         survey_done = SurveyResponse.objects.filter(candidate=request.candidate).exists()
-    game_done = GameResult.objects.filter(candidate=request.candidate, game_slug='radar-control').exists()
+    done_slugs = set(
+        GameResult.objects.filter(candidate=request.candidate).values_list('game_slug', flat=True)
+    )
+    game_done = all_games_done(done_slugs)
     interview = InterviewResponse.objects.filter(candidate=request.candidate).order_by('-created_at').first()
     interview_done = bool(interview) and (
         not interview.follow_up_question or bool(interview.follow_up_submitted_at)

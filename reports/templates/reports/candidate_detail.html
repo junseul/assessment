@@ -1,92 +1,178 @@
-{% extends "base.html" %}
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
 {% block title %}{{ email }} 리포트{% endblock %}
-{% block content %}
-<div style="margin-top: 40px;">
-  <p><a href="{% url 'reports:candidate_list' %}">&larr; 목록으로</a></p>
-  <h1>{% if candidate %}{{ candidate.name }}{% else %}{{ email }}{% endif %}</h1>
-  <p class="meta">{% if candidate %}{{ email }} · {% endif %}종합 리포트</p>
-
-  <div class="card">
-    <strong>완료 현황</strong>
-    <p>설문 {% if survey_complete %}완료{% else %}미완료{% endif %} · 게임 {% if game_complete %}완료{% else %}미완료{% endif %} · 면접 {% if interview_complete %}완료{% else %}미완료{% endif %}</p>
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'admin/css/forms.css' %}">
+  <link rel="stylesheet" href="{% static 'admin/css/responsive.css' %}">
+{% endblock %}
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">홈</a> &rsaquo;
+    <a href="{% url 'reports:candidate_list' %}">지원자 리포트</a> &rsaquo;
+    {% if candidate %}{{ candidate.name }}{% else %}{{ email }}{% endif %}
   </div>
-
-  <section class="module">
-    <h2>성향파악</h2>
-    {% for r in survey_responses %}
-      <div class="card">
-        <p class="meta">{{ r.survey.title }} · {{ r.created_at }}</p>
-        <p><strong>종합 환산점수:</strong> {{ r.score|default_if_none:"-" }} / 100 · {{ r.interpretation }}</p>
-        {% if r.score is not None %}
-          <dl class="report-dl">
-            {% for domain in r.domain_scores %}
-              <dt>{{ domain.label }}</dt><dd>{{ domain.score }}점 ({{ domain.answered }}문항 응답, 타임아웃 {{ domain.timed_out }}건)</dd>
-            {% endfor %}
-          </dl>
-          <dl class="report-dl">
-            <dt>극단응답 비율</dt><dd>{{ r.quality.extreme_response_rate|default_if_none:"-" }}</dd>
-            <dt>속응답 비율(1.5초 미만)</dt><dd>{{ r.quality.fast_response_rate|default_if_none:"-" }}</dd>
-            <dt>동일응답 최대 연속</dt><dd>{{ r.quality.max_same_answer_streak|default_if_none:"-" }}</dd>
-          </dl>
-        {% endif %}
-        {% if r.score is None %}
-          <dl class="report-dl">
-            {% for key, value in r.answers.items %}
-              <dt>{{ key }}</dt><dd>{{ value }}</dd>
-            {% endfor %}
-          </dl>
-        {% endif %}
+{% endblock %}
+{% block content_title %}
+  <h1>{% if candidate %}{{ candidate.name }}{% else %}{{ email }}{% endif %}</h1>
+{% endblock %}
+{% block content %}
+<div id="content-main">
+  <fieldset class="module aligned">
+    <h2 class="fieldset-heading">완료 현황</h2>
+    <div class="form-row">
+      <div><div class="flex-container">
+        <label>성향파악:</label>
+        <div class="readonly">{% if survey_complete %}완료{% else %}미완료{% endif %}</div>
+      </div></div>
+    </div>
+    {% for gs in game_statuses %}
+      <div class="form-row">
+        <div><div class="flex-container">
+          <label>전략게임 · {{ gs.title }}:</label>
+          <div class="readonly">{% if gs.done %}완료{% else %}미완료{% endif %}</div>
+        </div></div>
       </div>
-    {% empty %}
-      <p class="meta">제출된 설문이 없습니다.</p>
     {% endfor %}
-  </section>
+    <div class="form-row">
+      <div><div class="flex-container">
+        <label>영상면접:</label>
+        <div class="readonly">{% if interview_complete %}완료{% else %}미완료{% endif %}</div>
+      </div></div>
+    </div>
+  </fieldset>
 
-  <section class="module">
-    <h2>전략게임</h2>
-    {% for g in game_results %}
-      <div class="card">
-        <p class="meta"><span class="badge">{{ g.game_slug }}</span> · {{ g.created_at }}</p>
-        {% if g.is_expedition_investment %}
-          <dl class="report-dl">
-            <dt>최종 자원</dt><dd>{{ g.summary.final_total|default_if_none:"-" }}</dd>
-            <dt>시행 수</dt><dd>{{ g.summary.n_trials|default_if_none:"-" }}</dd>
-            <dt>탐색 비율</dt><dd>{{ g.summary.exploration_rate|default_if_none:"-" }}</dd>
-            <dt>학습 기울기</dt><dd>{{ g.summary.learning_rate|default_if_none:"-" }}</dd>
-            <dt>손실 후 동일선택 비율</dt><dd>{{ g.summary.loss_stay_rate|default_if_none:"-" }}</dd>
-            <dt>반전 적응도</dt><dd>{{ g.summary.reversal_adaptation|default_if_none:"-" }}</dd>
-            <dt>결과 변동성(위험선호)</dt><dd>{{ g.summary.outcome_variance|default_if_none:"-" }}</dd>
-            <dt>손실추격 지수</dt><dd>{{ g.summary.loss_chasing_index|default_if_none:"-" }}</dd>
-          </dl>
-        {% else %}
-          <dl class="report-dl">
-            <dt>정확도</dt><dd>{{ g.summary.accuracy }}</dd>
-            <dt>평균 반응시간(ms)</dt><dd>{{ g.summary.avg_rt_ms }}</dd>
-            <dt>시행 수</dt><dd>{{ g.summary.n_trials }}</dd>
-          </dl>
-        {% endif %}
-        <p><strong>해석:</strong> {{ g.interpretation }}</p>
+  {% for r in survey_responses %}
+    <fieldset class="module aligned">
+      <h2 class="fieldset-heading">성향파악 · {{ r.survey.title }} ({{ r.created_at }})</h2>
+      <div class="form-row">
+        <div><div class="flex-container">
+          <label>종합 환산점수:</label>
+          <div class="readonly">{{ r.score|default_if_none:"-" }} / 100 · {{ r.interpretation }}</div>
+        </div></div>
       </div>
-    {% empty %}
-      <p class="meta">완료된 게임이 없습니다.</p>
-    {% endfor %}
-  </section>
+      {% if r.score is not None %}
+        {% for domain in r.domain_scores %}
+          <div class="form-row">
+            <div><div class="flex-container">
+              <label>{{ domain.label }}:</label>
+              <div class="readonly">{{ domain.score }}점 ({{ domain.answered }}문항 응답, 타임아웃 {{ domain.timed_out }}건)</div>
+            </div></div>
+          </div>
+        {% endfor %}
+        <div class="form-row">
+          <div><div class="flex-container">
+            <label>극단응답 비율:</label>
+            <div class="readonly">{{ r.quality.extreme_response_rate|default_if_none:"-" }}</div>
+          </div></div>
+        </div>
+        <div class="form-row">
+          <div><div class="flex-container">
+            <label>속응답 비율(1.5초 미만):</label>
+            <div class="readonly">{{ r.quality.fast_response_rate|default_if_none:"-" }}</div>
+          </div></div>
+        </div>
+        <div class="form-row">
+          <div><div class="flex-container">
+            <label>동일응답 최대 연속:</label>
+            <div class="readonly">{{ r.quality.max_same_answer_streak|default_if_none:"-" }}</div>
+          </div></div>
+        </div>
+      {% endif %}
+      {% if r.score is None %}
+        {% for key, value in r.answers.items %}
+          <div class="form-row">
+            <div><div class="flex-container">
+              <label>{{ key }}:</label>
+              <div class="readonly">{{ value }}</div>
+            </div></div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </fieldset>
+  {% empty %}
+    <fieldset class="module aligned">
+      <h2 class="fieldset-heading">성향파악</h2>
+      <div class="form-row"><div><div class="readonly">제출된 설문이 없습니다.</div></div></div>
+    </fieldset>
+  {% endfor %}
 
-  <section class="module">
-    <h2>영상면접</h2>
-    {% for i in interview_responses %}
-      <div class="card">
-        <p class="meta">{{ i.created_at }}</p>
-        <p><strong>질문</strong><br>{{ i.question }}</p>
-        <p><strong>답변(음성인식)</strong><br>{{ i.transcript|default:"(인식된 텍스트 없음)" }}</p>
-        <p><strong>AI 후속 질문</strong><br>{{ i.follow_up_question|default:"(생성되지 않음)" }}</p>
-        {% if i.follow_up_question %}<p><strong>후속 답변</strong><br>{{ i.follow_up_transcript|default:"(미제출)" }}</p>{% endif %}
-        {% if i.video %}<video src="{% url 'interviews:serve_video' i.pk %}" controls style="width: 100%; max-width: 480px; border-radius: 0;"></video>{% endif %}
-        {% if i.follow_up_video %}<video src="{% url 'interviews:serve_follow_up_video' i.pk %}" controls style="width: 100%; max-width: 480px; border-radius: 0;"></video>{% endif %}
+  {% for g in game_results %}
+    <fieldset class="module aligned">
+      <h2 class="fieldset-heading">전략게임 · {{ g.game_slug }} ({{ g.created_at }})</h2>
+      {% for label, value in g.metrics %}
+        <div class="form-row">
+          <div><div class="flex-container">
+            <label>{{ label }}:</label>
+            <div class="readonly">{{ value|default_if_none:"-" }}</div>
+          </div></div>
+        </div>
+      {% endfor %}
+      <div class="form-row">
+        <div><div class="flex-container">
+          <label>해석:</label>
+          <div class="readonly">{{ g.interpretation }}</div>
+        </div></div>
       </div>
-    {% empty %}
-      <p class="meta">완료된 영상면접이 없습니다.</p>
-    {% endfor %}
-  </section>
+    </fieldset>
+  {% empty %}
+    <fieldset class="module aligned">
+      <h2 class="fieldset-heading">전략게임</h2>
+      <div class="form-row"><div><div class="readonly">완료된 게임이 없습니다.</div></div></div>
+    </fieldset>
+  {% endfor %}
+
+  {% for i in interview_responses %}
+    <fieldset class="module aligned">
+      <h2 class="fieldset-heading">영상면접 ({{ i.created_at }})</h2>
+      <div class="form-row">
+        <div><div class="flex-container">
+          <label>질문:</label>
+          <div class="readonly">{{ i.question }}</div>
+        </div></div>
+      </div>
+      <div class="form-row">
+        <div><div class="flex-container">
+          <label>답변(음성인식):</label>
+          <div class="readonly">{{ i.transcript|default:"(인식된 텍스트 없음)" }}</div>
+        </div></div>
+      </div>
+      <div class="form-row">
+        <div><div class="flex-container">
+          <label>AI 후속 질문:</label>
+          <div class="readonly">{{ i.follow_up_question|default:"(생성되지 않음)" }}</div>
+        </div></div>
+      </div>
+      {% if i.follow_up_question %}
+        <div class="form-row">
+          <div><div class="flex-container">
+            <label>후속 답변:</label>
+            <div class="readonly">{{ i.follow_up_transcript|default:"(미제출)" }}</div>
+          </div></div>
+        </div>
+      {% endif %}
+      {% if i.video %}
+        <div class="form-row">
+          <div><div class="flex-container">
+            <label>영상:</label>
+            <div class="readonly"><video src="{% url 'interviews:serve_video' i.pk %}" controls style="max-width: 480px; width: 100%;"></video></div>
+          </div></div>
+        </div>
+      {% endif %}
+      {% if i.follow_up_video %}
+        <div class="form-row">
+          <div><div class="flex-container">
+            <label>후속 영상:</label>
+            <div class="readonly"><video src="{% url 'interviews:serve_follow_up_video' i.pk %}" controls style="max-width: 480px; width: 100%;"></video></div>
+          </div></div>
+        </div>
+      {% endif %}
+    </fieldset>
+  {% empty %}
+    <fieldset class="module aligned">
+      <h2 class="fieldset-heading">영상면접</h2>
+      <div class="form-row"><div><div class="readonly">완료된 영상면접이 없습니다.</div></div></div>
+    </fieldset>
+  {% endfor %}
 </div>
 {% endblock %}

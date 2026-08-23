@@ -1,0 +1,247 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/admin-theme.css' %}">
+  <style>
+    .review-wrap { max-width: 1100px; }
+    .review-head { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; flex-wrap: wrap; }
+    .review-head h1 { margin: 0; font-size: 22px; }
+    .review-meta { color: var(--body-quiet-color); font-size: 13px; }
+    .review-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+    .review-status { display: none; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--body-quiet-color); font-size: 13px; }
+    .review-status.is-visible { display: flex; }
+    .review-spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid #d9d9d9; border-top-color: var(--primary);
+      animation: review-spin 0.8s linear infinite;
+    }
+    @keyframes review-spin { to { transform: rotate(360deg); } }
+    .review-error {
+      display: none; margin-bottom: 12px; padding: 12px 16px;
+      border: 1px solid #e0a0a0; background: var(--message-error-bg); color: #8a1f1f;
+    }
+    .review-error.is-visible { display: block; }
+    .review-result {
+      display: none; padding: 24px 28px; border: 1px solid var(--border-color);
+      background: #ffffff; line-height: 1.65; font-size: 13.5px;
+    }
+    .review-result.is-visible { display: block; }
+    .review-result h2, .review-result h3, .review-result h4, .review-result h5 {
+      margin: 20px 0 10px; line-height: 1.4;
+    }
+    .review-result h2 { font-size: 19px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; }
+    .review-result h3 { font-size: 16px; }
+    .review-result h4 { font-size: 14px; }
+    .review-result p { margin: 8px 0; }
+    .review-result ul, .review-result ol { margin: 8px 0; padding-left: 22px; }
+    .review-result li { margin: 3px 0; }
+    .review-result hr { margin: 18px 0; border: 0; border-top: 1px solid #eceff3; }
+    .review-result code {
+      padding: 1px 5px; background: #f2f2f2; font-size: 12.5px;
+    }
+    .review-result table {
+      width: 100%; margin: 12px 0; border-collapse: collapse; font-size: 12.5px;
+    }
+    .review-result th, .review-result td {
+      border: 1px solid #e3e6ea; padding: 6px 9px; text-align: left; vertical-align: top;
+    }
+    .review-result thead th { background: #f2f2f2; font-weight: 600; white-space: nowrap; }
+    .review-result tbody tr:nth-child(odd) { background: #fafafa; }
+  </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">홈</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label='traits' %}">성향파악</a>
+  &rsaquo; <a href="{% url 'admin:traits_survey_changelist' %}">설문</a>
+  &rsaquo; <a href="{% url 'admin:traits_survey_change' survey.pk %}">{{ survey.title }}</a>
+  &rsaquo; AI 문항 검토
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="review-wrap">
+  <div class="review-head">
+    <h1>AI 문항 검토</h1>
+    <span class="review-meta">{{ survey.title }} · 문항 {{ item_count }}개 · 모델 deepseek-v4-flash</span>
+  </div>
+
+  {% if not has_api_key %}
+  <div class="review-error is-visible">
+    DEEPSEEK_API_KEY 환경변수(deepseek-api)가 설정되지 않아 실행할 수 없습니다.
+  </div>
+  {% endif %}
+
+  <div class="review-actions">
+    <button type="button" class="button" id="review-run" {% if not has_api_key %}disabled{% endif %}>검토 실행</button>
+    <button type="button" class="button" id="review-copy" disabled>결과 복사</button>
+  </div>
+
+  <div class="review-status" id="review-status">
+    <span class="review-spinner"></span>
+    <span>DeepSeek가 전체 문항을 검토하고 있습니다. 수 분이 소요될 수 있습니다. 창을 닫지 마세요.</span>
+  </div>
+
+  <div class="review-error" id="review-error"></div>
+
+  <div class="review-result" id="review-result"></div>
+</div>
+
+<script>
+(function () {
+  var runUrl = '{% url "admin:traits_survey_item_review_run" survey.pk %}';
+  var csrfToken = '{{ csrf_token }}';
+  var runBtn = document.getElementById('review-run');
+  var copyBtn = document.getElementById('review-copy');
+  var statusEl = document.getElementById('review-status');
+  var errorEl = document.getElementById('review-error');
+  var resultEl = document.getElementById('review-result');
+  var rawText = '';
+  var running = false;
+
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function inline(s) {
+    return esc(s)
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>');
+  }
+
+  function buildTable(rows) {
+    function cells(r) {
+      return r.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); });
+    }
+    var bodyStart = rows.length > 1 && /^[\s|:\-]+$/.test(rows[1]) ? 2 : 1;
+    var html = '<table><thead><tr>' + cells(rows[0]).map(function (c) {
+      return '<th>' + inline(c) + '</th>';
+    }).join('') + '</tr></thead><tbody>';
+    for (var k = bodyStart; k < rows.length; k++) {
+      if (/^[\s|:\-]+$/.test(rows[k])) continue;
+      html += '<tr>' + cells(rows[k]).map(function (c) {
+        return '<td>' + inline(c) + '</td>';
+      }).join('') + '</tr>';
+    }
+    return html + '</tbody></table>';
+  }
+
+  function renderMd(text) {
+    var lines = text.split('\n');
+    var html = '';
+    var i = 0;
+    while (i < lines.length) {
+      var line = lines[i];
+      if (/^\s*\|.*\|\s*$/.test(line)) {
+        var rows = [];
+        while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { rows.push(lines[i]); i++; }
+        html += buildTable(rows);
+        continue;
+      }
+      if (/^\s*---+\s*$/.test(line)) { html += '<hr>'; i++; continue; }
+      var h = line.match(/^(#{1,4})\s+(.*)$/);
+      if (h) {
+        var lv = Math.min(h[1].length + 1, 5);
+        html += '<h' + lv + '>' + inline(h[2]) + '</h' + lv + '>';
+        i++;
+        continue;
+      }
+      if (/^\s*[-*]\s+/.test(line)) {
+        var items = [];
+        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\s*[-*]\s+/, '')); i++;
+        }
+        html += '<ul>' + items.map(function (t) { return '<li>' + inline(t) + '</li>'; }).join('') + '</ul>';
+        continue;
+      }
+      if (/^\s*\d+\.\s+/.test(line)) {
+        var oitems = [];
+        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+          oitems.push(lines[i].replace(/^\s*\d+\.\s+/, '')); i++;
+        }
+        html += '<ol>' + oitems.map(function (t) { return '<li>' + inline(t) + '</li>'; }).join('') + '</ol>';
+        continue;
+      }
+      if (line.trim() === '') { i++; continue; }
+      var para = [line];
+      i++;
+      while (
+        i < lines.length && lines[i].trim() !== '' &&
+        !/^(#{1,4}\s|\s*[-*]\s|\s*\d+\.\s|\s*\|)/.test(lines[i]) &&
+        !/^\s*---+\s*$/.test(lines[i])
+      ) { para.push(lines[i]); i++; }
+      html += '<p>' + inline(para.join(' ')) + '</p>';
+    }
+    return html;
+  }
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.classList.add('is-visible');
+  }
+
+  runBtn.addEventListener('click', function () {
+    if (running) return;
+    running = true;
+    rawText = '';
+    runBtn.disabled = true;
+    copyBtn.disabled = true;
+    errorEl.classList.remove('is-visible');
+    resultEl.classList.remove('is-visible');
+    resultEl.innerHTML = '';
+    statusEl.classList.add('is-visible');
+
+    fetch(runUrl, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+      credentials: 'same-origin'
+    }).then(function (resp) {
+      if (!resp.ok) {
+        return resp.json().catch(function () { return null; }).then(function (body) {
+          throw new Error((body && body.error) || ('요청 실패 (HTTP ' + resp.status + ')'));
+        });
+      }
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      function pump() {
+        return reader.read().then(function (chunk) {
+          if (chunk.done) {
+            statusEl.classList.remove('is-visible');
+            copyBtn.disabled = false;
+            running = false;
+            return;
+          }
+          rawText += decoder.decode(chunk.value, { stream: true });
+          resultEl.classList.add('is-visible');
+          resultEl.innerHTML = renderMd(rawText);
+          window.scrollTo(0, document.body.scrollHeight);
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (err) {
+      statusEl.classList.remove('is-visible');
+      showError(err.message || '알 수 없는 오류가 발생했습니다.');
+      if (rawText) {
+        resultEl.classList.add('is-visible');
+        resultEl.innerHTML = renderMd(rawText);
+        copyBtn.disabled = false;
+      }
+      running = false;
+      runBtn.disabled = false;
+    });
+  });
+
+  copyBtn.addEventListener('click', function () {
+    navigator.clipboard.writeText(rawText).then(function () {
+      var prev = copyBtn.textContent;
+      copyBtn.textContent = '복사됨';
+      setTimeout(function () { copyBtn.textContent = prev; }, 1500);
+    });
+  });
+})();
+</script>
+{% endblock %}

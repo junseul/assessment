@@ -1,9 +1,19 @@
+from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
 from django.urls import reverse
 from django.utils.html import format_html
 
+from config.admin_labels import AdminTitleMixin
+
 from .models import Candidate, Invite
+
+
+class InviteForm(forms.ModelForm):
+    class Meta:
+        model = Invite
+        fields = '__all__'
+        labels = {'candidate': '이름'}
 
 
 def invite_url(invite):
@@ -11,7 +21,8 @@ def invite_url(invite):
 
 
 @admin.register(Candidate)
-class CandidateAdmin(admin.ModelAdmin):
+class CandidateAdmin(AdminTitleMixin, admin.ModelAdmin):
+    changelist_title = '변경할 지원자 선택'
     list_display = ('name', 'email', 'phone', 'birthdate', 'created_at', 'report_link')
     search_fields = ('name', 'email', 'phone')
     list_filter = ('created_at',)
@@ -37,7 +48,8 @@ class CandidateAdmin(admin.ModelAdmin):
 
 
 @admin.register(Invite)
-class InviteAdmin(admin.ModelAdmin):
+class InviteAdmin(AdminTitleMixin, admin.ModelAdmin):
+    changelist_title = '변경할 초대 링크 선택'
     list_display = ('candidate', 'status', 'full_link', 'created_at', 'used_at')
     list_filter = ('used_at', 'created_at')
     search_fields = ('candidate__name', 'candidate__email', 'token')
@@ -45,11 +57,17 @@ class InviteAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
     list_per_page = 50
     readonly_fields = ('token', 'full_link', 'created_at', 'used_at')
+    form = InviteForm
     fieldsets = (
         ('응시자', {'fields': ('candidate',)}),
         ('초대 링크', {'fields': ('full_link', 'token')}),
         ('사용 기록', {'fields': ('created_at', 'used_at')}),
     )
+
+    def add_view(self, request, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['title'] = '초대링크 추가'
+        return super().add_view(request, form_url, extra_context)
 
     @admin.display(description='초대 링크')
     def full_link(self, obj):

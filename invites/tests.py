@@ -6,11 +6,12 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from games.catalog import GAMES
 from games.models import GameResult
 from traits.models import Survey
 from helpers import login_candidate, make_candidate
 
-from .models import Invite
+from .models import Candidate, Invite
 
 
 class VerifyTests(TestCase):
@@ -72,6 +73,36 @@ class StartTests(TestCase):
             fetch_redirect_response=False,
         )
 
+    def test_start_routes_to_first_game_before_survey_done(self):
+        Survey.objects.all().delete()
+        candidate = login_candidate(self.client)
+        response = self.client.get(reverse('invites:start'))
+        self.assertRedirects(
+            response, reverse('games:index'), fetch_redirect_response=False,
+        )
+
+        # 게임을 하나도 못 끝냈으면 다음 게임(1번)로 진행된다.
+        response = self.client.get(reverse('games:index'))
+        self.assertRedirects(
+            response, reverse('games:play', args=['radar-control']), fetch_redirect_response=False,
+        )
+
+    def test_start_moves_to_interview_after_all_games_done(self):
+        Survey.objects.all().delete()
+        candidate = login_candidate(self.client)
+        for game in GAMES:
+            if game['implemented']:
+                GameResult.objects.create(
+                    candidate=candidate, game_slug=game['slug'],
+                    respondent_email=candidate.email, trials=[], summary={},
+                )
+        response = self.client.get(reverse('invites:start'))
+        self.assertRedirects(
+            response,
+            reverse('interviews:interview_detail'),
+            fetch_redirect_response=False,
+        )
+
 
 @override_settings(DEBUG=True)
 class LocalTestTests(TestCase):
@@ -85,7 +116,16 @@ class LocalTestTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="nav-sidebar"')
         self.assertContains(response, reverse('games:admin_grid'))
-        self.assertEqual(self.client.session['candidate_id'], self.candidate.pk)
+        # 로컬 테스트는 접속자(관리자) 본인 명의의 전용 후보로 진행된다.
+        session_candidate = Candidate.objects.get(pk=self.client.session['candidate_id'])
+        self.assertEqual(session_candidate.name, 'admin')
+        self.assertEqual(session_candidate.email, 'local-test-admin@example.com')
+        # 로컬 테스트 페이지에 접속자 식별과 결과 보기 링크가 노출된다.
+        self.assertContains(response, 'local-test-admin@example.com')
+        self.assertContains(response, reverse('reports:candidate_detail', args=[session_candidate.pk]))
+        # 같은 관리자가 다시 접속해도 같은 후보가 재사용된다.
+        self.client.get(reverse('invites:local_test', args=['games']))
+        self.assertEqual(Candidate.objects.filter(email='local-test-admin@example.com').count(), 1)
 
     def test_traits_and_interviews_links_also_render_admin_iframe(self):
         response = self.client.get(reverse('invites:local_test', args=['interviews']))
@@ -105,16 +145,22 @@ class LocalTestTests(TestCase):
         # page inside the admin_local_test.html iframe.
         self.assertEqual(response.headers.get('X-Frame-Options'), 'SAMEORIGIN')
 
-    def test_local_game_submission_does_not_write_result(self):
+    def test_local_game_submission_saves_new_result_per_attempt(self):
         self.client.get(reverse('invites:local_test', args=['games']))
-        response = self.client.post(
-            reverse('games:submit_result', args=['radar-control']),
-            data=json.dumps({'trials': [], 'summary': {}}),
-            content_type='application/json',
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json()['local_test'])
-        self.assertFalse(GameResult.objects.exists())
+        candidate = Candidate.objects.get(pk=self.client.session['candidate_id'])
+        payload = json.dumps({'trials': [{'t': 1}], 'summary': {'accuracy': 1}})
+        for _ in range(2):
+            response = self.client.post(
+                reverse('games:submit_result', args=['radar-control']),
+                data=payload,
+                content_type='application/json',
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.json()['local_test'])
+        results = list(GameResult.objects.filter(candidate=candidate).order_by('id'))
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0].respondent_email, 'local-test-admin@example.com')
+        self.assertEqual(results[1].summary, {'accuracy': 1})
 
     @override_settings(DEBUG=False)
     def test_local_test_is_disabled_outside_debug(self):

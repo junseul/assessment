@@ -5,11 +5,11 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse, HttpResponseBadRequest, Http404
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from invites.decorators import candidate_required
 
-from .catalog import GAMES, get_game
+from .catalog import GAMES, get_game, next_game_slug
 from .models import GameResult
 
 # expedition-investment (전략게임) payoff table. Kept server-side only: if this
@@ -38,14 +38,16 @@ def admin_grid(request):
 
 @candidate_required
 def index(request):
+    # 후보에게 전체 목록을 보여주지 않고 카탈로그 순서(1~9번)대로 한 게임씩
+    # 진행시킨다. 게임 종료 화면의 목록 링크도 이 뷰를 거쳐 다음 게임으로
+    # 자연스럽게 이어진다.
     done_slugs = set(
         GameResult.objects.filter(candidate=request.candidate).values_list('game_slug', flat=True)
     )
-    games = [dict(g, done=g['slug'] in done_slugs) for g in GAMES]
-    return render(request, 'games/index.html', {
-        'candidate_name': request.session.get('candidate_name'),
-        'games': games,
-    })
+    next_slug = next_game_slug(done_slugs)
+    if next_slug is not None:
+        return redirect('games:play', slug=next_slug)
+    return redirect('invites:start')
 
 
 @candidate_required
@@ -85,7 +87,16 @@ def submit_result(request, slug):
     if not isinstance(trials, list) or not isinstance(summary, dict):
         return HttpResponseBadRequest('trials and summary are required')
 
+    # 로컬 테스트 모드는 접속자 본인 명의 후보로 진행되며, 시도할 때마다
+    # 새 결과를 저장한다 (실지원자처럼 중복 차단하지 않음).
     if request.session.get('local_test_mode'):
+        GameResult.objects.create(
+            game_slug=slug,
+            candidate=request.candidate,
+            respondent_email=request.candidate.email,
+            trials=trials,
+            summary=summary,
+        )
         return JsonResponse({'ok': True, 'local_test': True})
 
     if GameResult.objects.filter(candidate=request.candidate, game_slug=slug).exists():

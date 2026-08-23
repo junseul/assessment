@@ -10,11 +10,10 @@
 {% block extrahead %}{{ block.super }}<link rel="icon" href="{% static 'icons/assessment.svg' %}" type="image/svg+xml">{% endblock %}
 
 {% block branding %}
-<h1 id="site-name"><a href="{% url 'admin:index' %}"><img class="admin-brand-icon" src="{% static 'icons/assessment.svg' %}" alt="">역량검사 관리자</a></h1>
+<h1 id="site-name"><a href="{% url 'admin:index' %}"><img class="admin-brand-icon" src="{% static 'icons/assessment.svg' %}" alt="">AI 역량검사 관리자</a></h1>
 {% endblock %}
 
 {% block userlinks %}
-  <a href="{{ site_url }}">지원자 목록</a> /
   {% if user.has_usable_password %}
     <a href="{% url 'admin:password_change' %}">{% translate 'Change password' %}</a> /
   {% endif %}

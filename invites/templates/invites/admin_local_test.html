@@ -8,6 +8,13 @@
 
 {% block content %}
 <div id="content-main">
+  {% if tester %}
+  <div style="margin-bottom: 12px; padding: 10px 14px; border: 1px solid var(--border-color, #ccc); border-radius: 6px; background: var(--darkened-bg, #f8f8f8);">
+    <strong>로컬 테스트</strong>
+    <span style="margin-left: 10px;">접속자: {{ tester.name }} ({{ tester.email }})</span>
+    {% if tester.report_url %}<a href="{{ tester.report_url }}" style="margin-left: 12px;">게임 결과 보기 &rarr;</a>{% endif %}
+  </div>
+  {% endif %}
   <iframe src="{{ iframe_src }}" title="{{ title }}"
     style="width: 100%; height: calc(100vh - 220px); min-height: 560px; border: 1px solid var(--border-color, #ccc); border-radius: 6px; background: #fff;"></iframe>
 </div>

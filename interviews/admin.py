@@ -1,10 +1,13 @@
 from django.contrib import admin
 
+from config.admin_labels import AdminTitleMixin
+
 from .models import InterviewResponse
 
 
 @admin.register(InterviewResponse)
-class InterviewResponseAdmin(admin.ModelAdmin):
+class InterviewResponseAdmin(AdminTitleMixin, admin.ModelAdmin):
+    changelist_title = '변경할 면접 응답 선택'
     list_display = ('id', 'candidate', 'respondent_email', 'created_at', 'follow_up_submitted_at')
     list_filter = ('created_at', 'follow_up_submitted_at')
     search_fields = ('candidate__name', 'candidate__email', 'respondent_email', 'transcript')

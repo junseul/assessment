@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% block coltype %}colM{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block content %}
+<div id="content-main">
+  <div class="module">
+    <h2>LLM 가상 응시자 테스트</h2>
+    <p>DeepSeek가 가상 응시자의 행동 특성에 따라 성향 문항과 게임 상황에 답합니다. 실제 지원자 데이터는 읽거나 저장하지 않습니다.</p>
+    <p><strong>텍스트 상황 시뮬레이션입니다.</strong> 실제 게임 화면을 클릭하거나 시각·운동 능력을 측정하지 않습니다.
+      반응시간은 모델이 생성한 가상 값이며 LLM 호출 시간과 별도로 표시합니다. 결과는 채용 합격선이나 실제 사람의 능력을 검증하는 자료가 아닙니다.</p>
+    <p>선택한 제공자에 문항·가상 행동 특성을 전송하며 API 사용량이 발생합니다. 동일 시드는 상황을 재현하지만 LLM 응답의 재현성을 보장하지 않습니다.</p>
+  </div>
+  <form id="simulation-form" method="post">
+    {% csrf_token %}
+    <fieldset class="module aligned" id="simulation-inputs">
+      {% for field in form %}
+      <div class="form-row">{{ field.errors }}{{ field.label_tag }}{{ field }}</div>
+      {% endfor %}
+    </fieldset>
+    <div class="submit-row">
+      <button type="submit" class="button" id="simulation-start">시뮬레이션 시작</button>
+      <button type="button" class="button" id="simulation-resume" disabled>이어 실행 / 재시도</button>
+      <button type="button" class="button" id="simulation-stop" disabled>현재 응답 후 중지</button>
+      <button type="button" class="button" id="simulation-download" disabled>JSON 다운로드</button>
+    </div>
+  </form>
+  <p id="simulation-status" role="status" aria-live="polite">대기 중</p>
+  <progress id="simulation-progress" value="0" max="1" aria-label="시뮬레이션 진행률" style="width:100%"></progress>
+  <p id="simulation-error" role="alert"></p>
+  <div class="module">
+    <h2>항목별 결과</h2>
+    <div id="simulation-results"></div>
+  </div>
+  <div class="module">
+    <h2>응답 기록</h2>
+    <p>상세 상황과 전체 응답은 JSON 다운로드에 포함됩니다. 새로고침하면 실행 상태와 결과가 사라집니다.</p>
+    <div style="max-height:420px;overflow:auto">
+      <table style="width:100%">
+        <thead><tr><th scope="col">검사 / 순서</th><th scope="col">선택</th><th scope="col">가상 반응(ms)</th><th scope="col">LLM 호출(ms)</th><th scope="col">선택 설명</th></tr></thead>
+        <tbody id="simulation-log"></tbody>
+      </table>
+    </div>
+  </div>
+  <details class="module">
+    <summary>지원자 선별에 활용하는 방법</summary>
+    <ol>
+      <li>직무에서 관찰할 행동을 먼저 정합니다. 성향검사 총점만으로 좋은 지원자를 정하지 않습니다.</li>
+      <li>성향검사의 빠른 응답·동일 응답 반복·미응답은 재확인 신호입니다. 거짓말이나 부적격으로 단정하지 않습니다.</li>
+      <li>정확도와 속도, 규칙 전환 오류, 피드백 후 전략 수정을 함께 보고 직무 과제와 구조화 면접으로 확인합니다.</li>
+      <li>실제 직무성과와의 관계·재검사 안정성·응시 조건에 따른 차이를 검증한 뒤 기준을 정하고 사람이 최종 판단합니다.</li>
+    </ol>
+    <p><a href="https://www.opm.gov/policy-data-oversight/assessment-and-selection/assessment-strategy/">OPM 평가 전략</a> ·
+      <a href="https://www.opm.gov/policy-data-oversight/assessment-and-selection/other-assessment-methods/structured-interviews/">구조화 면접</a></p>
+  </details>
+</div>
+{% endblock %}
+{% block extrahead %}{{ block.super }}<script src="{% static 'js/assessment-simulation.js' %}" defer></script>{% endblock %}

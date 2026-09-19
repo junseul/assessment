@@ -1,0 +1,9 @@
+{% load static %}
+<style>
+  #playArea { position: relative; isolation: isolate; }
+  .game-three-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+  #playArea .three-replaced { opacity: 0 !important; }
+  .three-exp-site { display: block; width: 72px; height: 54px; margin: 0 auto 8px; background: #e8eef5; border-radius: 8px; }
+  .three-renderer-notice { color: #7a1f22; font-size: 14px; }
+</style>
+<script src="{% static 'js/game-three.js' %}" defer></script>

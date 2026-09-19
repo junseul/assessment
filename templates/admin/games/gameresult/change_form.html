@@ -1,0 +1,45 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+{% block after_field_sets %}
+<style>
+.gr-section{margin:16px 0}
+.gr-section h2{font-size:14px;font-weight:700;margin:0 0 8px;padding:6px 10px;background:#417690;color:#fff;border-radius:4px}
+.gr-table{width:100%;border-collapse:collapse;font-size:13px}
+.gr-table th,.gr-table td{padding:6px 10px;border:1px solid #ddd;text-align:left}
+.gr-table th{background:#f7f7f7;font-weight:600;width:40%}
+.gr-tog{cursor:pointer;color:#417690;font-size:13px;margin-top:8px;display:inline-block}
+.gr-tog:hover{text-decoration:underline}
+.gr-box{display:none;margin-top:8px;max-height:400px;overflow-y:auto}
+.gr-box.open{display:block}
+.gr-tt{width:100%;border-collapse:collapse;font-size:12px}
+.gr-tt th{background:#f0f0f0;position:sticky;top:0}
+.gr-tt th,.gr-tt td{padding:4px 6px;border:1px solid #e0e0e0}
+.gr-tt tr:nth-child(even){background:#fafafa}
+</style>
+<div class="gr-section">
+<h2>결과 요약</h2>
+<table class="gr-table">
+{% for label, value in game_metrics %}
+<tr><th>{{ label }}</th><td>{% if value is not None %}{{ value }}{% else %}<span style="color:#999">-</span>{% endif %}</td></tr>
+{% endfor %}
+</table>
+</div>
+<div class="gr-section">
+<h2>시행 데이터 ({{ trial_count }}건)</h2>
+<span class="gr-tog" onclick="var b=document.getElementById('trialsBox');b.classList.toggle('open');this.textContent=b.classList.contains('open')?'접기':'펼치기'">펼치기</span>
+<div id="trialsBox" class="gr-box">
+{% if trial_rows %}
+<table class="gr-tt">
+<thead><tr>{% for col in trial_columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+<tbody>
+{% for row in trial_rows %}
+<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p style="color:#999">시행 데이터가 없습니다.</p>
+{% endif %}
+</div>
+</div>
+{% endblock %}

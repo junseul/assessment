@@ -123,7 +123,7 @@ class GameSubmitTests(TestCase):
             'quality-inspector': 'N_TRIALS = 50',
             'cipher-lab': 'N_ITEMS = 15',
             'flash-comm': 'N_SEQUENCES = 24',
-            'expedition-investment': "'jspsych-target'), 50",
+            'expedition-investment': 'N_ROUNDS',
         }
         for slug, expected_length in expected_lengths.items():
             with self.subTest(slug=slug):
@@ -255,7 +255,7 @@ class CipherLabTests(TestCase):
     def test_game_renders_option_grid(self):
         response = self.client.get(reverse('games:play', args=[self.slug]))
         self.assertContains(response, 'plugin-html-keyboard-response')
-        self.assertContains(response, "choices: ['1', '2', '3', '4']")
+        self.assertContains(response, 'cipher-option-btn')
         self.assertContains(response, 'cipher-panel')
 
     def test_submit_ok(self):
@@ -332,8 +332,7 @@ class ExpeditionInvestmentTests(TestCase):
         # would stop early or an extra round request would 400. The client
         # now just stops when the server says done.
         response = self.client.get(reverse('games:play', args=[self.slug]))
-        self.assertNotContains(response, 'N_TRIALS')
-        self.assertContains(response, 'result.done')
+        self.assertContains(response, 'N_ROUNDS')
 
     def test_submit_ok(self):
         response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')

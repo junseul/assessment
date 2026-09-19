@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "run-deepseek-cli": "^0.1.1"
+    "run-deepseek-cli": "^0.1.1",
+    "three": "0.186.0"
   }
 }

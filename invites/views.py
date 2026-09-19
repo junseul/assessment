@@ -23,6 +23,10 @@ def local_test(request, stage):
     if not settings.DEBUG:
         raise Http404
 
+    if stage == 'simulation':
+        from .simulation_views import simulation_page
+        return simulation_page(request)
+
     # 로컬 테스트는 접속자(로그인한 관리자) 본인 명의로 진행한다. 실지원자
     # 데이터를 건드리지 않도록, 관리자 username 기반의 전용 테스트 후보를
     # 사용해 같은 관리자의 결과가 한 후보 아래에 누적되게 한다.

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}전략게임: 탐사대 투자{% endblock %}
 {% block extra_head %}
+{% include "games/three_assets.html" %}
 <script src="https://unpkg.com/jspsych@7.3.4"></script>
 <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
 <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
@@ -145,7 +146,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
     return den === 0 ? null : num / den;
   }
 
-  const REVERSAL_INDEX = 50; // for client-side analysis only; the server enforces the real reversal point and trial count
+  const REVERSAL_INDEX = 25; // ponytail: must match EXPEDITION_REVERSAL_INDEX in views.py — the server enforces the real reversal point and trial count
 
   function resolveDeck(deckLetter) {
     return fetch(roundUrl, {
@@ -160,7 +161,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
 
   let runningTotal = 0;
   let lastOutcome = null;
-  const N_ROUNDS = 50; // must match EXPEDITION_TRIALS in games/views.py
+  const N_ROUNDS = 50; // ponytail: server enforces actual trial count (views.py) — do not add a client-side limit
   const progress = createGameProgress(document.getElementById('jspsych-target'), N_ROUNDS);
 
   function refreshResource() {
@@ -319,7 +320,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
         return '<div class="exp-prompt"><h2>탐사할 지역을 선택하세요</h2><p>선택한 지역의 자원 증감 결과가 곧 표시됩니다.</p></div>';
       },
       choices: ['A 지역', 'B 지역', 'C 지역', 'D 지역'],
-      button_html: '<button class="exp-choice">%choice%</button>',
+      button_html: '<button class="exp-choice"><span class="three-exp-site" aria-hidden="true"></span>%choice%</button>',
       data: { trial_stage: 'choice', trial_index: i },
       on_finish: function (data) {
         const deckLetter = DECK_LETTERS[Number(data.response)];

@@ -1,0 +1,88 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Three.js renderer regression checks</title>
+<!-- From repository root: python -m http.server 8790 --bind 127.0.0.1
+     Open /games/browser_checks/three_renderer.html and click Run checks. -->
+<style>
+  #playArea { position: relative; isolation: isolate; width: 400px; height: 200px; }
+  .game-three-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+  .three-replaced { opacity: 0 !important; }
+  #stimulus > div { position: absolute; left: 50px; top: 50px; width: 80px; height: 80px; background: #22a06b; }
+  #stimulus .drone { width: 32px; height: 32px; }
+  #stimulus #ssStim { font: bold 56px sans-serif; }
+  #stimulus .cipher-panel { background: none; }
+  .cipher-panel > span > span { display: inline-block; font-size: 40px; color: #2f6fed; transform: rotate(90deg); }
+</style>
+<button id="startBtn">Run checks</button>
+<pre id="result">Ready</pre>
+<div id="playArea"><div id="stimulus"></div></div>
+<script src="../../static/js/game-three.js" defer></script>
+<script>
+  const result = document.getElementById('result');
+  const stimulus = document.getElementById('stimulus');
+  const nextFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
+  function assert(value, message) { if (!value) throw new Error(message); }
+  function pixels() {
+    const source = document.querySelector('.game-three-canvas');
+    assert(source, 'Renderer must remain active');
+    const copy = document.createElement('canvas');
+    copy.width = source.width; copy.height = source.height;
+    const ctx = copy.getContext('2d');
+    ctx.drawImage(source, 0, 0);
+    return ctx.getImageData(0, 0, copy.width, copy.height).data;
+  }
+  const colorCount = (data, channel) => {
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 200
+      && data[i + channel] > data[i + (1 - channel)] * 1.25) count++;
+    return count;
+  };
+  document.getElementById('startBtn').addEventListener('click', async () => {
+    document.getElementById('startBtn').disabled = true;
+    result.textContent = 'Running…';
+    let passed = 0;
+    try {
+      for (const html of [
+        '<div class="radar-target normal"></div>', '<div class="brake-box"></div>',
+        '<div class="sort-item" style="border-radius:50%"></div>', '<div class="drone target-highlight"></div>',
+        '<div class="search-item odd" style="transform:rotate(45deg)"></div>',
+        '<div class="cipher-panel"><span><span>➤</span></span></div>',
+        '<div class="rsvp-item" style="background:#111;border-radius:50%"></div>',
+        '<div id="ssStim">★</div>', '<div class="three-exp-site"></div>',
+      ]) {
+        stimulus.innerHTML = html;
+        await nextFrame();
+        const data = pixels();
+        assert(data.some((value, index) => index % 4 === 3 && value > 0), `Empty canvas: ${html}`);
+        assert(stimulus.querySelector('.three-replaced'), `Original not replaced: ${html}`);
+        passed++;
+      }
+      stimulus.innerHTML = '<div class="brake-box"></div>';
+      await nextFrame();
+      assert(colorCount(pixels(), 1) > 100, 'Go signal must be green');
+      stimulus.firstChild.style.backgroundColor = '#e5484d';
+      await nextFrame();
+      assert(colorCount(pixels(), 0) > 100, 'Stop signal must turn red');
+      passed++;
+      stimulus.innerHTML = '';
+      await nextFrame();
+      assert(!pixels().some((value, index) => index % 4 === 3 && value > 0), 'Blank interval retained old stimulus');
+      passed++;
+      document.getElementById('playArea').style.width = '300px';
+      stimulus.innerHTML = '<div class="sort-item"></div>';
+      await nextFrame();
+      assert(document.querySelector('canvas').style.width === '300px', 'Resize not applied');
+      passed++;
+      const canvas = document.querySelector('.game-three-canvas');
+      const lose = canvas.getContext('webgl2').getExtension('WEBGL_lose_context');
+      assert(lose, 'Context loss test unavailable');
+      lose.loseContext();
+      for (let i = 0; i < 30 && document.querySelector('.game-three-canvas'); i++) await nextFrame();
+      assert(!document.querySelector('.game-three-canvas'), 'Lost context canvas not removed');
+      assert(!stimulus.querySelector('.three-replaced'), 'Fallback did not restore DOM');
+      assert(document.querySelector('.three-renderer-notice'), 'Fallback notice missing');
+      passed++;
+      result.textContent = `PASS: ${passed} checks (9 games, signal change, blank, resize, context loss)`;
+    } catch (error) { result.textContent = `FAIL after ${passed} checks: ${error.message}`; }
+  });
+</script>

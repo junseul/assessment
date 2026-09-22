@@ -131,8 +131,8 @@ div.breadcrumbs {
 }
 
 #nav-sidebar .local-test-menu caption {
-    background: #2563eb;
-    color: #ffffff;
+    background: #f3f4f6;
+    color: #4b5563;
 }
 
 #nav-sidebar .local-test-menu th {
@@ -214,6 +214,13 @@ div.breadcrumbs {
     padding: 16px;
 }
 
+.dashboard-action-links .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
 .dashboard-period {
     margin-bottom: 24px;
 }
@@ -239,6 +246,10 @@ div.breadcrumbs {
     border-color: #2563eb;
     outline: 0;
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.dashboard-period-form .button {
+    min-width: 88px;
 }
 
 .dashboard-period-sep {

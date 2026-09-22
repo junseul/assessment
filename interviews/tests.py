@@ -27,6 +27,13 @@ class InterviewSubmitTests(TestCase):
         response = self.client.get(reverse('interviews:interview_detail'))
         self.assertEqual(response.headers.get('X-Frame-Options'), 'SAMEORIGIN')
 
+    def test_start_gate_has_three_visual_and_spaced_layout(self):
+        response = self.client.get(reverse('interviews:interview_detail'))
+        self.assertContains(response, 'id="interviewThree"')
+        self.assertContains(response, 'js/interviews-start-three.js')
+        self.assertContains(response, 'interview-start-card')
+        self.assertContains(response, 'interview-start-btn')
+
     def test_invalid_file_rejected(self):
         response = self.client.post(self.url, {
             'transcript': '안녕하세요',

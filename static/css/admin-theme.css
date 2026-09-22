@@ -110,6 +110,19 @@ div.breadcrumbs {
     background: #eff6ff;
 }
 
+/* Django 기본(dark 사이드바 가정) 규칙이 현재 앱 카테고리 제목을 흰색으로
+   지정한다. 라이트 사이드바에서는 흰 글씨가 묻히므로 Linear 스타일 —
+   연한 파랑 배경 + 진한 파랑 글씨 — 로 덮어쓴다. */
+#nav-sidebar .current-app caption,
+#nav-sidebar .current-app .module caption,
+#nav-sidebar .current-app .section:link,
+#nav-sidebar .current-app .section:visited,
+#nav-sidebar .module.current-app caption {
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: bold;
+}
+
 #nav-sidebar .local-test-menu {
     margin-top: 12px;
     border: 0;

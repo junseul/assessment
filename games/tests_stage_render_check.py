@@ -31,4 +31,7 @@ class StageRenderCheckTests(TestCase):
         staff.force_login(get_user_model().objects.get(username='render-check'))
         html = staff.get(reverse('games:admin_grid')).content.decode()
         self.assertIn('css/game-stage.css', html)
-        self.assertEqual(html.count('game-select-card'), 9)
+        self.assertEqual(html.count('class="game-select-card"'), 9)
+        self.assertIn('js/game-icons-three.js', html)
+        self.assertIn('game-icons-canvas', html)
+        self.assertIn('game-icon-float', html)

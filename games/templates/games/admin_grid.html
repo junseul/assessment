@@ -7,6 +7,35 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'css/lightdash.css' %}">
 {% include "games/game_stage_assets.html" %}
+<style>
+  /* 전략게임 선택 카드 — 아이콘 애니메이션 + three.js 배경 */
+  .game-select-grid { position: relative; }
+  .game-icons-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .game-select-grid > .game-select-card { position: relative; z-index: 1; }
+  .game-select-grid > .game-select-card.is-complete { background: var(--color-surface-primary); }
+
+  /* 아이콘 펄스: 카드마다 위상을 달리해 순서대로 숨 쉬듯 움직임 */
+  .game-icons-animated .game-select-icon { animation: game-icon-float 3s ease-in-out infinite; }
+  @keyframes game-icon-float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-4px) scale(1.06); }
+  }
+
+  /* 호버 틸트: 마우스 방향으로 카드가 살짝 기울고 아이콘이 반응 */
+  .game-select-grid > a.game-select-card { transform: perspective(700px); }
+  .game-select-grid > a.game-select-card:hover, .game-select-grid > a.game-select-card:focus-visible {
+    transform: perspective(700px) translateY(-2px);
+  }
+  .game-select-grid > a.game-select-card:hover .game-select-icon { background: var(--color-primary-100); transform: rotate(-6deg) scale(1.12); }
+  .game-select-card .game-select-icon { transition: background var(--transition-fast), transform var(--transition-fast); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .game-icons-animated .game-select-icon { animation: none; }
+    .game-select-grid > a.game-select-card, .game-select-grid > a.game-select-card:hover { transform: none; }
+  }
+</style>
+<script src="{% static 'js/game-icons-three.js' %}" defer></script>
+</head>
 </head>
 <body class="game-hub-page">
 <main class="game-hub">

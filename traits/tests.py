@@ -6,7 +6,30 @@ from django.urls import reverse
 from helpers import login_candidate
 
 from .models import Survey, SurveyResponse
+from .interpretation import describe_domain, percentile_rank, score_band
 from .survey_definition import QUESTION_TEXT, response_quality, score_answers
+
+
+class InterpretationTests(TestCase):
+    def test_score_band_boundaries(self):
+        self.assertEqual(score_band(70), ('high', '높은 수준'))
+        self.assertEqual(score_band(69.9), ('mid', '보통 수준'))
+        self.assertEqual(score_band(40), ('mid', '보통 수준'))
+        self.assertEqual(score_band(39.9), ('low', '낮은 수준'))
+        self.assertEqual(score_band(None), (None, None))
+
+    def test_describe_domain_returns_band_text(self):
+        self.assertIn('원칙과 규정', describe_domain('honesty_humility', 80))
+        self.assertIn('균형', describe_domain('honesty_humility', 50))
+        self.assertIn('유연하게 해석', describe_domain('honesty_humility', 20))
+        self.assertIsNone(describe_domain('honesty_humility', None))
+
+    def test_percentile_rank(self):
+        # 75점: 아래 1명(25), 동점 1명(본인) → (1 + 0.5) / 2 = 75%
+        self.assertEqual(percentile_rank([25, 75], 75), 75)
+        self.assertEqual(percentile_rank([75], 75), 50)
+        self.assertIsNone(percentile_rank([], 75))
+        self.assertIsNone(percentile_rank([25, 75], None))
 
 
 class SurveySubmitTests(TestCase):
@@ -28,6 +51,13 @@ class SurveySubmitTests(TestCase):
         self.assertContains(response, 'id="timeBar"')
         self.assertContains(response, 'remaining / currentLimitMs * 100')
         self.assertNotContains(response, 'const schema = {')
+
+    def test_start_gate_has_three_visual_and_spaced_layout(self):
+        response = self.client.get(reverse('traits:survey_detail', args=[self.survey.pk]))
+        self.assertContains(response, 'id="startThree"')
+        self.assertContains(response, 'js/traits-start-three.js')
+        self.assertContains(response, 'traits-start-card')
+        self.assertContains(response, 'traits-start-btn')
 
     def test_page_is_frameable_from_same_origin(self):
         # Admin's local-test iframe (invites.views.local_test) embeds this

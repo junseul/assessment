@@ -52,11 +52,43 @@
         </div></div>
       </div>
       {% if r.score is not None %}
-        {% for domain in r.domain_scores %}
+        <div class="form-row">
+          <div><div class="flex-container">
+            <label>백분위 기준:</label>
+            <div class="readonly">전체 응시자 {{ r.norm_size }}명의 도메인별 점수 분포 기준 (백분위는 해당 점수 이하 응시자 비율)</div>
+          </div></div>
+        </div>
+        <h3 style="margin: 12px 0 2px;">성격모델 6요인</h3>
+        {% for domain in r.personality_domains %}
           <div class="form-row">
             <div><div class="flex-container">
               <label>{{ domain.label }}:</label>
-              <div class="readonly">{{ domain.score }}점 ({{ domain.answered }}문항 응답, 타임아웃 {{ domain.timed_out }}건)</div>
+              <div class="readonly">
+                {% if domain.score is not None %}
+                  {{ domain.score }}점 · 백분위 {{ domain.percentile|default_if_none:"-" }}% · {{ domain.band_label }}
+                  ({{ domain.answered }}문항 응답, 타임아웃 {{ domain.timed_out }}건)<br>
+                  <span style="color: var(--body-quiet-color);">{{ domain.description }}</span>
+                {% else %}
+                  점수 문항 없음 ({{ domain.answered }}문항 응답, 타임아웃 {{ domain.timed_out }}건)
+                {% endif %}
+              </div>
+            </div></div>
+          </div>
+        {% endfor %}
+        <h3 style="margin: 12px 0 2px;">직무역량 4요인</h3>
+        {% for domain in r.job_domains %}
+          <div class="form-row">
+            <div><div class="flex-container">
+              <label>{{ domain.label }}:</label>
+              <div class="readonly">
+                {% if domain.score is not None %}
+                  {{ domain.score }}점 · 백분위 {{ domain.percentile|default_if_none:"-" }}% · {{ domain.band_label }}
+                  ({{ domain.answered }}문항 응답, 타임아웃 {{ domain.timed_out }}건)<br>
+                  <span style="color: var(--body-quiet-color);">{{ domain.description }}</span>
+                {% else %}
+                  점수 문항 없음 ({{ domain.answered }}문항 응답, 타임아웃 {{ domain.timed_out }}건)
+                {% endif %}
+              </div>
             </div></div>
           </div>
         {% endfor %}

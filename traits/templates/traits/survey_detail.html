@@ -1,12 +1,33 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ survey.title }}{% endblock %}
+{% block extra_head %}
+<script src="{% static 'js/traits-start-three.js' %}" defer></script>
+<style>
+  /* 성향파악 시작 카드 — three.js 비주얼과 여백을 포함한 전용 레이아웃 */
+  .traits-start-card { overflow: hidden; text-align: center; }
+  .traits-start-visual {
+    position: relative;
+    height: 240px;
+    margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) var(--space-6);
+    border-bottom: 1px solid var(--color-border-default);
+    background: linear-gradient(180deg, #0b1530 0%, #132b5e 60%, var(--color-surface-primary) 100%);
+  }
+  .traits-start-canvas { position: absolute; inset: 0; }
+  .traits-start-title { font-size: 26px; margin: var(--space-3) 0 var(--space-4); }
+  .traits-start-text { color: var(--color-text-secondary); line-height: 1.6; margin: 0 0 var(--space-2); }
+  .traits-start-btn { margin-top: var(--space-5); min-width: 160px; justify-content: center; }
+</style>
+{% endblock %}
 {% block content %}
 <div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card"{% if already_done %} style="display: none;"{% endif %}>
-    <h1 style="font-size: 24px;">{{ survey.title }}</h1>
-    <p>{{ candidate_name }}님, 각 문항은 한 번씩 표시되며 제한시간은 6~8초입니다.</p>
-    <p>평소 자신의 모습과 가장 가까운 응답을 선택해 주세요.</p>
-    <button id="startBtn" class="btn btn-primary">검사 시작</button>
+  <div id="startGate" class="card traits-start-card"{% if already_done %} style="display: none;"{% endif %}>
+    <div id="startThree" class="traits-start-visual" aria-hidden="true"></div>
+    <span class="badge badge-primary">성향 파악 검사</span>
+    <h1 class="traits-start-title">{{ survey.title }}</h1>
+    <p class="traits-start-text">{{ candidate_name }}님, 각 문항은 한 번씩 표시되며 제한시간은 6~8초입니다.</p>
+    <p class="traits-start-text">평소 자신의 모습과 가장 가까운 응답을 선택해 주세요.</p>
+    <button id="startBtn" class="btn btn-primary traits-start-btn">검사 시작</button>
   </div>
 
   <div id="questionPanel" class="card" style="display: none;">

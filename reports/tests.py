@@ -152,6 +152,49 @@ class ReportTests(TestCase):
         self.assertContains(response, '강점 수준')
         self.assertContains(response, '정확한 반응 억제')
 
+    def test_detail_groups_domains_with_percentile_and_description(self):
+        survey = Survey.objects.create(title='역량 설문', schema={})
+        SurveyResponse.objects.create(
+            candidate=self.candidate,
+            survey=survey,
+            respondent_email=self.candidate.email,
+            answers={'q001': 4, 'q103': 5},
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        # 성격모델 6요인 / 직무역량 4요인 그룹 헤더
+        self.assertContains(response, '성격모델 6요인')
+        self.assertContains(response, '직무역량 4요인')
+        # 규준 집단이 본인뿐이면 백분위는 50%
+        self.assertContains(response, '백분위 50%')
+        # 정직·겸손성 75점(high) / 주도성 100점(high) 해석 문구
+        self.assertContains(response, '원칙과 규정을 중시하고 부당한 이익을 추구하지 않는 수준')
+        self.assertContains(response, '먼저 문제를 찾아 행동하고 제안하는 수준')
+        self.assertContains(response, '높은 수준', count=2)
+        # 점수를 계산할 수 없는 도메인은 '점수 문항 없음'
+        self.assertContains(response, '점수 문항 없음', count=8)
+
+    def test_percentile_compares_against_other_respondents(self):
+        survey = Survey.objects.create(title='역량 설문', schema={})
+        SurveyResponse.objects.create(
+            candidate=self.candidate,
+            survey=survey,
+            respondent_email=self.candidate.email,
+            answers={'q001': 4},  # 정직·겸손성 75점
+        )
+        other = make_candidate(name='김철수', email='kim@example.com')
+        SurveyResponse.objects.create(
+            candidate=other,
+            survey=survey,
+            respondent_email=other.email,
+            answers={'q001': 2},  # 정직·겸손성 25점
+        )
+        self.client.login(username='hr', password='pass')
+        response = self.client.get(reverse('reports:candidate_detail', args=[self.candidate.pk]))
+        # 75점: 25점 1명이 아래, 동점(본인) 절반 → (1 + 0.5) / 2 = 백분위 75%
+        self.assertContains(response, '75.0점 · 백분위 75%')
+        self.assertContains(response, '전체 응시자 2명의 도메인별 점수 분포 기준')
+
     def test_expedition_investment_shows_its_own_metrics_other_games_unaffected(self):
         GameResult.objects.create(
             candidate=self.candidate,

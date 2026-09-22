@@ -1,11 +1,32 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}영상면접{% endblock %}
+{% block extra_head %}
+<script src="{% static 'js/interviews-start-three.js' %}" defer></script>
+<style>
+  /* 영상면접 시작 카드 — three.js 비주얼과 여백을 포함한 전용 레이아웃 */
+  .interview-start-card { overflow: hidden; text-align: center; }
+  .interview-start-visual {
+    position: relative;
+    height: 240px;
+    margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) var(--space-6);
+    border-bottom: 1px solid var(--color-border-default);
+    background: linear-gradient(180deg, var(--color-primary-50) 0%, var(--color-surface-primary) 100%);
+  }
+  .interview-start-canvas { position: absolute; inset: 0; }
+  .interview-start-title { font-size: 26px; margin: var(--space-3) 0 var(--space-4); }
+  .interview-start-text { color: var(--color-text-secondary); line-height: 1.6; margin: 0 0 var(--space-2); }
+  .interview-start-btn { margin-top: var(--space-5); min-width: 160px; justify-content: center; }
+</style>
+{% endblock %}
 {% block content %}
 <div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card"{% if has_first_response %} style="display: none;"{% endif %}>
-    <h1 style="font-size: 24px;">영상면접</h1>
-    <p>{{ candidate_name }}님, 카메라와 마이크 권한을 허용한 뒤 질문에 답변해주세요.</p>
-    <button id="startBtn" class="btn btn-primary">카메라 준비</button>
+  <div id="startGate" class="card interview-start-card"{% if has_first_response %} style="display: none;"{% endif %}>
+    <div id="interviewThree" class="interview-start-visual" aria-hidden="true"></div>
+    <span class="badge badge-primary">영상면접</span>
+    <h1 class="interview-start-title">영상면접</h1>
+    <p class="interview-start-text">{{ candidate_name }}님, 카메라와 마이크 권한을 허용한 뒤 질문에 답변해주세요.</p>
+    <button id="startBtn" class="btn btn-primary interview-start-btn">카메라 준비</button>
   </div>
 
   <div id="followUpPanel" class="card"{% if not existing or not existing.follow_up_question or existing.follow_up_submitted_at %} style="display: none;"{% endif %}>

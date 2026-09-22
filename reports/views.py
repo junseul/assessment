@@ -6,8 +6,11 @@ from games.catalog import GAMES
 from games.models import GameResult
 from interviews.models import InterviewResponse
 from invites.models import Candidate
+from traits.interpretation import (
+    PERSONALITY_KEYS, describe_domain, percentile_rank, score_band,
+)
 from traits.models import SurveyResponse
-from traits.survey_definition import response_quality, score_answers
+from traits.survey_definition import DOMAINS, response_quality, score_answers
 
 # 각 게임의 summary에 저장된 키를 리포트 표시 라벨로 매핑한다. 게임별 측정
 # 지표가 서로 달라, 공통 키(accuracy/avg_rt_ms/n_trials)만 가정하면 대부분
@@ -180,6 +183,33 @@ def _build_game_interpretation(result):
     return '해석 불가'
 
 
+def _collect_domain_norms():
+    """전체 설문 응답을 규준 집단으로 도메인별 점수 분포를 만든다 (읽기 전용).
+
+    응답 일부만 있는 응답도 해당 도메인 점수가 계산 가능하면 규준에 포함한다.
+    """
+    norms = {key: [] for key, *_ in DOMAINS}
+    for answers in SurveyResponse.objects.values_list('answers', flat=True):
+        for item in score_answers(answers):
+            if item['score'] is not None:
+                norms[item['key']].append(item['score'])
+    return norms
+
+
+def _annotate_domains(response, norms, norm_size):
+    """도메인 점수에 백분위·수준·해석을 붙여 성격 6요인/직무역량 4요인으로 나눈다."""
+    personality, job = [], []
+    for item in response.domain_scores:
+        _, band_label = score_band(item['score'])
+        item['percentile'] = percentile_rank(norms[item['key']], item['score'])
+        item['band_label'] = band_label
+        item['description'] = describe_domain(item['key'], item['score'])
+        (personality if item['key'] in PERSONALITY_KEYS else job).append(item)
+    response.personality_domains = personality
+    response.job_domains = job
+    response.norm_size = norm_size
+
+
 @login_required
 def candidate_list(request):
     candidates = Candidate.objects.order_by('-created_at')
@@ -196,8 +226,11 @@ def candidate_detail(request, pk):
     survey_responses = list(
         SurveyResponse.objects.filter(candidate=candidate).select_related('survey').order_by('-created_at')
     )
+    norms = _collect_domain_norms() if survey_responses else {}
+    norm_size = SurveyResponse.objects.count() if survey_responses else 0
     for response in survey_responses:
         response.domain_scores = score_answers(response.answers)
+        _annotate_domains(response, norms, norm_size)
         ratings = [item['score'] for item in response.domain_scores if item['score'] is not None]
         response.score = round(sum(ratings) / len(ratings), 1) if ratings else None
         response.interpretation = (

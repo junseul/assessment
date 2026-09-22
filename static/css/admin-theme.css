@@ -488,10 +488,15 @@ a.button {
     background: #f9fafb;
 }
 
+/* 로그인 카드를 헤더를 제외한 영역의 정중앙에 배치한다. */
+.login #main {
+    align-items: center;
+}
+
 .login #content {
     max-width: 400px;
-    margin: 64px auto;
-    padding: 0 24px;
+    margin: 0 auto;
+    padding: 24px;
 }
 
 .admin-login-card {

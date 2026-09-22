@@ -87,6 +87,19 @@
       map.colorSpace = THREE.SRGBColorSpace;
       glyphs.set(char, keep(new THREE.MeshBasicMaterial({ map, transparent: true })));
     }
+    // 자극 아래 옅은 접지 그림자 — 보드 위에 떠 있는 입체감을 준다 (표시 전용).
+    const shadowCanvas = document.createElement('canvas');
+    shadowCanvas.width = shadowCanvas.height = 64;
+    const shadowContext = shadowCanvas.getContext('2d');
+    const shadowGradient = shadowContext.createRadialGradient(32, 32, 0, 32, 32, 32);
+    shadowGradient.addColorStop(0, 'rgba(23, 34, 56, .5)');
+    shadowGradient.addColorStop(.6, 'rgba(23, 34, 56, .2)');
+    shadowGradient.addColorStop(1, 'rgba(23, 34, 56, 0)');
+    shadowContext.fillStyle = shadowGradient;
+    shadowContext.fillRect(0, 0, 64, 64);
+    const shadowMap = keep(new THREE.CanvasTexture(shadowCanvas));
+    shadowMap.colorSpace = THREE.SRGBColorSpace;
+    const shadowMaterial = keep(new THREE.MeshBasicMaterial({ map: shadowMap, transparent: true, depthWrite: false }));
     function mesh(group, geometry, color, scale, position = [0,0,0], flat = false) {
       const object = new THREE.Mesh(geometry, material(color, flat));
       object.scale.set(...scale);
@@ -98,6 +111,10 @@
     function create(el) {
       const group = new THREE.Group();
       let signal, outline, glyph;
+      const shadow = new THREE.Mesh(disc, shadowMaterial);
+      shadow.scale.set(1.14, 1.14, 1);
+      shadow.position.set(0, -0.04, -0.3);
+      group.add(shadow);
       if (el.matches('.radar-target')) {
         signal = mesh(group, ring, '#22a06b', [1,1,1]);
         mesh(group, aircraft, '#dbe5ee', [.85,.85,.85], [0,0,.05]);
@@ -152,6 +169,8 @@
       mesh(warm, geometry, '#2f6fed', [1,1,1], [0,0,0], true);
     }
     glyphs.forEach(mat => { warm.add(new THREE.Mesh(plane, mat)); renderer.initTexture(mat.map); });
+    warm.add(new THREE.Mesh(disc, shadowMaterial));
+    renderer.initTexture(shadowMap);
     scene.add(warm);
     renderer.setSize(1, 1, false);
     await renderer.compileAsync(scene, camera);

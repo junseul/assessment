@@ -1,0 +1,233 @@
+/* ============================================================
+   전략게임 3D 스테이지 (게임 화면 전용 테마)
+   ------------------------------------------------------------
+   - 9개 게임 템플릿과 게임 선택 화면이 공통으로 include 하는 파일이다.
+   - 게임 타이밍·입력·점수 로직에는 관여하지 않는 표시 계층만 담당한다.
+   - three.js(WebGL) 배경을 그릴 수 있을 때만 <html class="game-stage">가
+     붙고, 그릴 수 없으면 클래스가 붙지 않아 기존 라이트 화면이 그대로 유지된다.
+   ============================================================ */
+
+/* 1. 게임 템플릿이 참조하는 디자인 토큰
+      (프로젝트 공통 팔레트에 맞춘 라이트 기준값. 이 파일이 없으면 변수가
+       해석되지 않아 게임 표면·버튼이 투명하게 렌더링된다.) */
+
+:root {
+  --font-body: var(--font-family-sans);
+  --font-mono: var(--font-family-mono);
+  --radius-cards: var(--radius-xl);
+  --radius-buttons: var(--radius-md);
+
+  --color-canvas-white: #ffffff;
+  --color-cloud-mist: #e9eff7;
+  --color-mist-border: #dbe1ea;
+  --color-lilac-whisper: #f4f6fd;
+  --color-lavender-wash: #eff3ff;
+  --color-steel-text: #4b5563;
+  --color-slate-body: #4b5563;
+  --color-fog-text: #6b7280;
+  --color-graphite-heading: #111827;
+  --color-midnight-ink: #111827;
+  --color-volt-violet: #a78bfa;
+}
+
+/* 2. 3D 아레나 배경 레이어 (game-stage.js가 생성) */
+
+.game-stage-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* 3. 다크 콘솔 테마
+      배경·패널·HUD만 어둡게 하고, 게임 표면(#jspsych-target) 내부는
+      4장에서 라이트 팔레트로 되돌려 자극 가독성을 그대로 보존한다. */
+
+html.game-stage {
+  --color-surface-primary: #121b2d;
+  --color-surface-secondary: #0b1220;
+  --color-surface-tertiary: #18223a;
+  --color-text-primary: #eaf0fb;
+  --color-text-secondary: #a7b7d1;
+  --color-text-tertiary: #8595b3;
+  --color-border-default: #23314c;
+  --color-border-hover: #33456b;
+  --color-gray-50: #131c2f;
+  --color-gray-100: #18233a;
+  --color-gray-200: #22304b;
+
+  --color-canvas-white: #121b2d;
+  --color-cloud-mist: #121b2d;
+  --color-mist-border: #26334d;
+  --color-lilac-whisper: #16203a;
+  --color-lavender-wash: #1a2440;
+  --color-steel-text: #a7b7d1;
+  --color-slate-body: #a7b7d1;
+  --color-fog-text: #8595b3;
+  --color-graphite-heading: #eaf0fb;
+  --color-midnight-ink: #eaf0fb;
+
+  --game-accent: #4f7cf7;
+  --game-panel-bg: rgba(13, 22, 38, .82);
+  --game-hud-bg: rgba(12, 20, 35, .9);
+}
+
+html.game-stage body { background: var(--color-surface-secondary); }
+
+html.game-stage .navbar,
+html.game-stage .page,
+html.game-stage .game-hub {
+  position: relative;
+  z-index: 1;
+}
+
+/* 게임 콘솔 프레임: HUD와 게임 표면을 감싸는 패널 */
+html.game-stage #playArea {
+  position: relative;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-xl);
+  background: var(--game-panel-bg);
+  box-shadow: inset 0 0 0 1px rgba(79, 124, 247, .12), 0 24px 60px rgba(3, 8, 18, .55);
+}
+
+html.game-stage #playArea::before {
+  content: 'PLAY';
+  position: absolute;
+  top: -10px;
+  left: var(--space-4);
+  padding: 0 6px;
+  background: #0b1220;
+  color: var(--game-accent);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 19px;
+  letter-spacing: .18em;
+}
+
+/* 진행/시간 HUD — 게임 조작 패널 느낌 */
+html.game-stage .game-progress {
+  border-color: var(--color-border-default);
+  border-left: 3px solid var(--game-accent);
+  background: var(--game-hud-bg);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono);
+}
+
+html.game-stage .game-progress strong { color: var(--color-text-primary); }
+
+/* 시작 카드 / 완료 카드 */
+html.game-stage .card {
+  border-color: var(--color-border-default);
+  background: var(--game-panel-bg);
+  box-shadow: 0 24px 60px rgba(3, 8, 18, .55);
+}
+
+html.game-stage [class$="-eyebrow"] {
+  color: var(--game-accent);
+  font-family: var(--font-family-mono);
+  letter-spacing: .18em;
+}
+
+html.game-stage #startGate h1,
+html.game-stage #thanksMsg h2 { color: var(--color-text-primary); }
+
+html.game-stage #thanksMsg p { color: var(--color-text-secondary); }
+
+/* 게임 버튼 — 눌리는 느낌과 외곽 발광 */
+html.game-stage .btn { min-height: 40px; }
+
+html.game-stage .btn-primary {
+  border-color: var(--game-accent);
+  box-shadow: 0 0 0 1px rgba(79, 124, 247, .35), 0 12px 26px rgba(37, 99, 235, .35);
+}
+
+html.game-stage .btn-primary:hover { background: var(--color-primary-500); }
+
+html.game-stage .btn-primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 0 0 1px rgba(79, 124, 247, .35), 0 6px 14px rgba(37, 99, 235, .3);
+}
+
+html.game-stage .btn-ghost { color: var(--color-text-secondary); }
+html.game-stage .btn-ghost:hover { background: var(--color-gray-100); color: var(--color-text-primary); }
+
+/* 4. 게임 표면 — 밝은 보드를 유지해 자극 가독성을 보존한다 */
+
+html.game-stage #jspsych-target {
+  --color-surface-primary: #ffffff;
+  --color-surface-secondary: #f7f9fd;
+  --color-surface-tertiary: #eef3fa;
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #6b7280;
+  --color-border-default: #e5e7eb;
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+
+  --color-canvas-white: #ffffff;
+  --color-cloud-mist: #e9eff7;
+  --color-mist-border: #dbe1ea;
+  --color-lilac-whisper: #f4f6fd;
+  --color-lavender-wash: #eff3ff;
+  --color-steel-text: #4b5563;
+  --color-slate-body: #4b5563;
+  --color-fog-text: #6b7280;
+  --color-graphite-heading: #111827;
+  --color-midnight-ink: #111827;
+
+  background: #e9eff7;
+  border: 1px solid #2b3a58;
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px rgba(79, 124, 247, .16), 0 18px 44px rgba(3, 8, 18, .5);
+}
+
+/* 5. 전략게임 로비(게임 선택) 화면 */
+
+html.game-stage .game-hub-page { background: var(--color-surface-secondary); }
+html.game-stage .game-hub-heading h1 { color: var(--color-text-primary); }
+html.game-stage .game-hub-heading p { color: var(--color-text-secondary); }
+
+html.game-stage .game-hub-eyebrow {
+  color: var(--game-accent);
+  font-family: var(--font-family-mono);
+  letter-spacing: .24em;
+}
+
+html.game-stage .game-select-card {
+  border-color: var(--color-border-default);
+  background: var(--game-panel-bg);
+  box-shadow: inset 0 0 0 1px rgba(79, 124, 247, .06);
+}
+
+html.game-stage .game-select-card:hover,
+html.game-stage .game-select-card:focus-visible {
+  border-color: var(--game-accent);
+  box-shadow: 0 0 0 1px var(--game-accent), 0 16px 34px rgba(37, 99, 235, .32);
+}
+
+html.game-stage .game-select-icon { background: rgba(79, 124, 247, .16); color: #9dbcff; }
+html.game-stage .game-select-card:hover .game-select-icon { background: rgba(79, 124, 247, .3); }
+html.game-stage .game-select-card strong { color: var(--color-text-primary); }
+html.game-stage .game-select-description { color: var(--color-text-tertiary); }
+html.game-stage .game-select-status { background: rgba(79, 124, 247, .16); color: #bcd0ff; }
+html.game-stage .game-select-number { color: #55688a; font-size: var(--font-size-sm); letter-spacing: .12em; }
+html.game-stage .game-select-card.is-complete { background: rgba(13, 22, 38, .6); }
+html.game-stage .game-select-card.is-complete .game-select-status { background: rgba(34, 197, 94, .18); color: #7ce0a5; }
+
+/* 6. 반응형 / 모션 최소화 */
+
+@media (max-width: 560px) {
+  html.game-stage #playArea { padding: var(--space-3); }
+  html.game-stage .game-progress { font-family: var(--font-family-sans); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.game-stage .game-select-card,
+  html.game-stage .game-select-card:hover,
+  html.game-stage .game-select-card:focus-visible { transform: none; }
+  html.game-stage .btn-primary:active { transform: none; }
+}

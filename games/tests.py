@@ -1,5 +1,8 @@
 import json
+import re
 
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
@@ -418,3 +421,45 @@ class ExpeditionInvestmentTests(TestCase):
             data=json.dumps({'deck': 'A'}), content_type='application/json',
         )
         self.assertRedirects(response, reverse('invites:no_access'), target_status_code=403)
+
+
+class GameStageAssetTests(TestCase):
+    """전략게임 화면의 3D 스테이지 자산(three.js 배경 + 콘솔 테마)이 실제로 로드되는지 고정한다.
+    게임 규칙·점수에는 관여하지 않는 표시 계층이므로 여기서는 로드 여부만 확인한다."""
+
+    def setUp(self):
+        login_candidate(self.client)
+
+    def test_every_play_page_loads_stage_assets(self):
+        for game in GAMES:
+            if not game['implemented']:
+                continue
+            with self.subTest(slug=game['slug']):
+                response = self.client.get(reverse('games:play', args=[game['slug']]))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'css/game-stage.css')
+                self.assertContains(response, 'js/game-stage.js')
+                self.assertContains(response, 'js/game-three.js')
+
+    def test_admin_grid_loads_stage_assets(self):
+        get_user_model().objects.create_superuser('local-tester', 'local-tester@example.com', 'pw')
+        self.client.force_login(get_user_model().objects.get(username='local-tester'))
+        response = self.client.get(reverse('games:admin_grid'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'css/game-stage.css')
+        self.assertContains(response, 'js/game-stage.js')
+
+    def test_game_templates_only_use_defined_design_tokens(self):
+        """게임 템플릿이 참조하는 CSS 변수가 static/css에 정의되어 있는지 확인한다.
+        정의되지 않은 변수는 배경·버튼을 투명하게 만들어 화면이 깨진다."""
+        css_dirs = [settings.BASE_DIR / 'static' / 'css']
+        css_text = ''.join(
+            path.read_text(encoding='utf-8') for directory in css_dirs for path in directory.glob('*.css')
+        )
+        defined = set(re.findall(r'^\s*(--[a-z0-9-]+)\s*:', css_text, flags=re.MULTILINE))
+
+        used = set()
+        for path in (settings.BASE_DIR / 'games' / 'templates' / 'games').glob('*.html'):
+            used.update(re.findall(r'var\(\s*(--[a-z0-9-]+)', path.read_text(encoding='utf-8')))
+
+        self.assertEqual(used - defined, set())

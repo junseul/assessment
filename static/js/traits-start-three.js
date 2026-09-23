@@ -1,8 +1,8 @@
-/* 성향파악 시작 화면 장식용 three.js 비주얼.
-   검사 로직(타이밍·입력·채점)에는 관여하지 않는 표시 계층이다.
-   WebGL을 사용할 수 없으면 아무 표시 없이 기본 화면으로 진행한다. */
+/* personality start-screen image animation rendered with Three.js. */
 (() => {
-  const moduleUrl = new URL('../vendor/three/three.module.js', document.currentScript.src);
+  const scriptUrl = document.currentScript.src;
+  const moduleUrl = new URL('../vendor/three/three.module.js', scriptUrl);
+  const imageUrl = new URL('../images/assessment/traits-personality-hero.png', scriptUrl);
   const gate = document.getElementById('startGate');
   const host = document.getElementById('startThree');
   if (!gate || !host) return;
@@ -23,140 +23,147 @@
 
   function fallback(error) {
     release();
-    console.warn('Three.js start visual unavailable:', error);
+    console.warn('Three.js personality visual unavailable:', error);
   }
 
-  import(moduleUrl.href).then(THREE => {
+  import(moduleUrl.href).then(async THREE => {
     if (stopped) return;
     renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.className = 'traits-start-canvas';
     renderer.domElement.setAttribute('aria-hidden', 'true');
-    renderer.domElement.addEventListener('webglcontextlost', event => {
-      event.preventDefault();
-      fallback('WebGL context lost');
-    }, { once: true });
     host.append(renderer.domElement);
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-    camera.position.set(0, 0.6, 8);
-    camera.lookAt(0, 0, 0);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x8a97ab, 1.6));
-    const light = new THREE.DirectionalLight(0xffffff, 2);
-    light.position.set(-3, 5, 6);
-    scene.add(light);
-
-    // AI 머신: 딥네이비 무대 위 발광 코어 + 자이로 링 + 데이터 파티클
-    const core = new THREE.Mesh(
-      keep(new THREE.IcosahedronGeometry(0.85, 1)),
-      keep(new THREE.MeshStandardMaterial({
-        color: 0x0b1e4b, emissive: 0x2563eb, emissiveIntensity: 1.1,
-        roughness: 0.3, metalness: 0.6, flatShading: true,
-      })),
-    );
-    scene.add(core);
-    const coreShell = new THREE.Mesh(
-      keep(new THREE.IcosahedronGeometry(1.05, 1)),
-      keep(new THREE.MeshBasicMaterial({
-        color: 0x22d3ee, wireframe: true, transparent: true, opacity: 0.28,
-      })),
-    );
-    scene.add(coreShell);
-
-    // 자이로 링 2개
-    const gyroA = new THREE.Mesh(
-      keep(new THREE.TorusGeometry(1.7, 0.03, 12, 96)),
-      keep(new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.3, metalness: 0.8 })),
-    );
-    gyroA.rotation.x = Math.PI / 2.4;
-    scene.add(gyroA);
-    const gyroB = new THREE.Mesh(
-      keep(new THREE.TorusGeometry(2.0, 0.02, 12, 96)),
-      keep(new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.55 })),
-    );
-    gyroB.rotation.x = Math.PI / 3;
-    gyroB.rotation.y = 0.5;
-    scene.add(gyroB);
-
-    // 링 위 궤도 위성 4개
-    const satellites = [];
-    const satGeo = keep(new THREE.SphereGeometry(0.09, 20, 14));
-    [0x22d3ee, 0x8b5cf6, 0x3b82f6, 0x67e8fb].forEach((color, index) => {
-      const sat = new THREE.Mesh(satGeo, keep(new THREE.MeshBasicMaterial({ color })));
-      sat.userData.phase = (index / 4) * Math.PI * 2;
-      scene.add(sat);
-      satellites.push(sat);
-    });
-
-    // 데이터 파티클 구
-    const particleCount = 260;
-    const positions = new Float32Array(particleCount * 3);
-    for (let i = 0; i < particleCount; i += 1) {
-      const r = 2.6 + Math.random() * 0.9;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = r * Math.cos(phi) * 0.7;
-      positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-    }
-    const particleGeo = keep(new THREE.BufferGeometry());
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const particles = new THREE.Points(particleGeo, keep(new THREE.PointsMaterial({
-      color: 0x7dd3fc, size: 0.045, transparent: true, opacity: 0.8,
-    })));
-    scene.add(particles);
-
-    // 바닥 그리드와 펄스 링
-    const grid = new THREE.GridHelper(9, 18, 0x1e40af, 0x16295e);
-    grid.position.y = -2.0;
-    grid.material.transparent = true;
-    grid.material.opacity = 0.5;
-    scene.add(grid);
-    const pulseMat = keep(new THREE.MeshBasicMaterial({
-      color: 0x22d3ee, transparent: true, opacity: 0,
-      side: THREE.DoubleSide, depthWrite: false,
+    const texture = keep(await new THREE.TextureLoader().loadAsync(imageUrl.href));
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const uniforms = {
+      uTexture: { value: texture },
+      uResolution: { value: new THREE.Vector2(1, 1) },
+      uImageSize: { value: new THREE.Vector2(texture.image.width, texture.image.height) },
+      uPointer: { value: new THREE.Vector2() },
+      uTime: { value: 0 },
+    };
+    const material = keep(new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader: [
+        'varying vec2 vUv;',
+        'void main() { vUv = uv; gl_Position = vec4(position, 1.0); }',
+      ].join('\n'),
+      fragmentShader: [
+        'uniform sampler2D uTexture;',
+        'uniform vec2 uResolution, uImageSize, uPointer;',
+        'uniform float uTime;',
+        'float hash21(vec2 p) {',
+        '  p = fract(p * vec2(123.34, 456.21));',
+        '  p += dot(p, p + 45.32);',
+        '  return fract(p.x * p.y);',
+        '}',
+        'varying vec2 vUv;',
+        'void main() {',
+        '  float screenRatio = uResolution.x / uResolution.y;',
+        '  float imageRatio = uImageSize.x / uImageSize.y;',
+        '  vec2 cover = screenRatio < imageRatio ? vec2(screenRatio / imageRatio, 1.0) : vec2(1.0, imageRatio / screenRatio);',
+        '  float breath = 0.977 + sin(uTime * 0.42) * 0.006;',
+        '  vec2 uv = (vUv - 0.5) * cover * breath + 0.5 - uPointer * vec2(0.013, 0.018);',
+        '  uv += vec2(sin(uv.y * 14.0 + uTime * 1.5), cos(uv.x * 12.0 - uTime * 1.25)) * 0.006;',
+        '  vec3 color = texture2D(uTexture, uv).rgb;',
+        '  float sweepX = fract(uTime * 0.12) * 1.5 - 0.25;',
+        '  float sheen = smoothstep(0.19, 0.0, abs(vUv.x - sweepX));',
+        '  float focus = 1.0 - smoothstep(0.25, 0.78, distance(vUv, vec2(0.5) + uPointer * 0.06));',
+        '  color += vec3(0.34, 0.48, 0.95) * (sheen * 0.07 + focus * 0.025);',
+        '  vec2 sparkleGrid = vUv * vec2(72.0, 28.0);',
+        '  vec2 sparkleCell = floor(sparkleGrid);',
+        '  float seed = hash21(sparkleCell);',
+        '  float sparkleShape = smoothstep(0.13, 0.0, length(fract(sparkleGrid) - 0.5));',
+        '  float sparkle = step(0.965, seed) * sparkleShape * pow(max(0.0, sin(uTime * 3.4 + seed * 19.0)), 14.0);',
+        '  color += vec3(0.72, 0.87, 1.0) * sparkle * 0.85;',
+        '  gl_FragColor = vec4(color, 1.0);',
+        '}',
+      ].join('\n'),
     }));
-    const pulse = new THREE.Mesh(keep(new THREE.RingGeometry(1.15, 1.22, 64)), pulseMat);
-    scene.add(pulse);
+    const scene = new THREE.Scene();
+    scene.add(new THREE.Mesh(keep(new THREE.PlaneGeometry(2, 2)), material));
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 2);
+    camera.position.z = 1;
+    const traitAccents = [
+      [-0.56, 0.28, 0x829dff], [0, 0.70, 0xffa690], [0.55, 0.30, 0x65dcff],
+      [-0.48, -0.42, 0x86c7ff], [0.48, -0.40, 0xa98cff],
+    ].map(([x, y, color], index) => {
+      const group = new THREE.Group();
+      const accentMaterial = keep(new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0.55, depthTest: false,
+        blending: THREE.AdditiveBlending,
+      }));
+      group.add(new THREE.Mesh(keep(new THREE.RingGeometry(0.105, 0.116, 64, 1, 0, Math.PI * 1.45)), accentMaterial));
+      const haloMaterial = keep(accentMaterial.clone());
+      haloMaterial.opacity = 0.18;
+      group.add(new THREE.Mesh(keep(new THREE.RingGeometry(0.132, 0.137, 64, 1, Math.PI * 0.45, Math.PI * 1.1)), haloMaterial));
+      const dot = new THREE.Mesh(
+        keep(new THREE.CircleGeometry(0.018, 24)),
+        keep(accentMaterial.clone()),
+      );
+      dot.position.x = 0.15;
+      group.add(dot);
+      const spark = new THREE.Mesh(
+        keep(new THREE.CircleGeometry(0.012, 20)),
+        keep(accentMaterial.clone()),
+      );
+      spark.position.x = -0.17;
+      group.add(spark);
+      group.position.set(x, y, 0.2);
+      group.userData.baseX = x;
+      group.userData.baseY = y;
+      group.userData.phase = index * 1.25;
+      scene.add(group);
+      return { group, dot, spark, accentMaterial, haloMaterial };
+    });
+    const targetPointer = new THREE.Vector2();
+    host.addEventListener('pointermove', event => {
+      const rect = host.getBoundingClientRect();
+      targetPointer.set(
+        (event.clientX - rect.left) / rect.width - 0.5,
+        0.5 - (event.clientY - rect.top) / rect.height,
+      );
+    });
+    host.addEventListener('pointerleave', () => targetPointer.set(0, 0));
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const motionFactor = reduced ? 0.28 : 1;
     let width = 0, height = 0;
     function draw(time = 0) {
-      // 검사 시작으로 게이트가 숨겨지면 렌더링을 멈춘다.
       if (stopped || !gate.isConnected || gate.offsetParent === null) { release(); return; }
-      try {
-        const bounds = host.getBoundingClientRect();
-        if (!bounds.width || !bounds.height) return;
-        if (width !== bounds.width || height !== bounds.height) {
-          width = bounds.width; height = bounds.height;
-          renderer.setSize(width, height);
-          camera.aspect = width / height;
-          camera.updateProjectionMatrix();
-        }
-        const t = time / 1000;
-        core.rotation.y = t * 0.5;
-        core.rotation.x = Math.sin(t * 0.4) * 0.12;
-        coreShell.rotation.y = -t * 0.25;
-        coreShell.rotation.z = t * 0.15;
-        gyroA.rotation.z = t * 0.5;
-        gyroB.rotation.z = -t * 0.35;
-        for (const sat of satellites) {
-          const angle = sat.userData.phase + t * 0.6;
-          sat.position.set(Math.cos(angle) * 1.7, Math.sin(angle) * 0.7, Math.sin(angle) * 1.7 * 0.45);
-        }
-        particles.rotation.y = t * 0.05;
-        grid.position.z = (t * 0.35) % 0.5;
-        const pulseCycle = (t * 0.5) % 1;
-        const pulseScale = 1 + pulseCycle * 1.9;
-        pulse.scale.set(pulseScale, pulseScale, pulseScale);
-        pulseMat.opacity = 0.42 * (1 - pulseCycle);
-        renderer.render(scene, camera);
-      } catch (error) { fallback(error); }
+      const nextWidth = host.clientWidth;
+      const nextHeight = host.clientHeight;
+      if (!nextWidth || !nextHeight) return;
+      if (width !== nextWidth || height !== nextHeight) {
+        width = nextWidth;
+        height = nextHeight;
+        const rect = host.getBoundingClientRect();
+        const displayScale = Math.max(rect.width / width, rect.height / height, 1);
+        renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * displayScale, 3));
+        renderer.setSize(width, height);
+        uniforms.uResolution.value.set(width, height);
+      }
+      const seconds = time / 1000 * motionFactor;
+      uniforms.uPointer.value.lerp(targetPointer, 0.035);
+      uniforms.uTime.value = seconds;
+      traitAccents.forEach(({ group, dot, spark, accentMaterial, haloMaterial }, index) => {
+        const wave = Math.sin(seconds * 1.35 + group.userData.phase);
+        group.scale.setScalar(1 + wave * 0.16);
+        group.position.x = group.userData.baseX + Math.sin(seconds * 0.9 + group.userData.phase) * 0.035;
+        group.position.y = group.userData.baseY + Math.cos(seconds * 1.15 + group.userData.phase) * 0.045;
+        group.rotation.z = seconds * (index % 2 ? -1.25 : 1.25) + group.userData.phase;
+        dot.scale.setScalar(0.8 + (wave + 1) * 0.45);
+        spark.scale.setScalar(0.65 + Math.abs(Math.sin(seconds * 3.2 + group.userData.phase)) * 1.15);
+        accentMaterial.opacity = 0.58 + (wave + 1) * 0.16;
+        haloMaterial.opacity = 0.12 + (wave + 1) * 0.12;
+      });
+      renderer.render(scene, camera);
     }
 
-    if (reduced) draw(0);
-    else renderer.setAnimationLoop(draw);
+    renderer.setAnimationLoop(draw);
     observer = new MutationObserver(() => { if (gate.style.display === 'none') release(); });
     observer.observe(gate, { attributes: true, attributeFilter: ['style'] });
   }).catch(fallback);

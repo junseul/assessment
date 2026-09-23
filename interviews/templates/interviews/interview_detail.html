@@ -2,26 +2,30 @@
 {% load static %}
 {% block title %}영상면접{% endblock %}
 {% block extra_head %}
-<script src="{% static 'js/interviews-start-three.js' %}" defer></script>
+<script src="{% static 'js/interviews-start-three.js' %}?v=3" defer></script>
 <style>
   /* 영상면접 시작 카드 — three.js 비주얼과 여백을 포함한 전용 레이아웃 */
   .interview-start-card { overflow: hidden; text-align: center; }
   .interview-start-visual {
+    overflow: hidden;
     position: relative;
-    height: 240px;
+    height: 360px;
     margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) var(--space-6);
     border-bottom: 1px solid var(--color-border-default);
     background: linear-gradient(180deg, var(--color-primary-50) 0%, var(--color-surface-primary) 100%);
   }
   .interview-start-canvas { position: absolute; inset: 0; }
-  .interview-start-title { font-size: 26px; margin: var(--space-3) 0 var(--space-4); }
+  .interview-start-title { font-size: 39px; margin: var(--space-3) 0 var(--space-4); }
   .interview-start-text { color: var(--color-text-secondary); line-height: 1.6; margin: 0 0 var(--space-2); }
-  .interview-start-btn { margin-top: var(--space-5); min-width: 160px; justify-content: center; }
+  .interview-start-btn { margin-top: var(--space-5); min-width: 240px; justify-content: center; }
+  .interview-shell { max-width: 960px; margin: 40px auto 0; }
+
+  #followUpPanel, #resultPanel { max-width: 640px; margin-inline: auto; }
 </style>
 {% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card interview-start-card"{% if has_first_response %} style="display: none;"{% endif %}>
+<div class="interview-shell">
+  <div id="startGate" class="card interview-start-card ui-size-150"{% if has_first_response %} style="display: none;"{% endif %}>
     <div id="interviewThree" class="interview-start-visual" aria-hidden="true"></div>
     <span class="badge badge-primary">영상면접</span>
     <h1 class="interview-start-title">영상면접</h1>
@@ -41,17 +45,17 @@
     </form>
   </div>
 
-  <div id="interviewPanel" class="card" style="display: none;">
+  <div id="interviewPanel" class="card ui-size-150" style="display: none;">
     <p class="meta">질문</p>
     <h2>{{ question }}</h2>
     <video id="preview" autoplay muted playsinline style="width: 100%; border-radius: 0; background: var(--color-onyx);"></video>
-    <div style="margin-top: 16px; display: flex; gap: 12px;">
+    <div style="margin-top: 24px; display: flex; gap: 18px;">
       <button id="recordBtn" class="btn btn-primary">녹화 시작</button>
       <button id="stopBtn" class="btn btn-ghost" disabled>녹화 종료 및 제출</button>
     </div>
-    <p style="margin-top: 16px;">
+    <p style="margin-top: 24px;">
       <span class="meta">실시간 인식된 답변</span><br>
-      <span id="transcriptPreview" style="font-family: var(--font-mono); font-size: 13px;"></span>
+      <span id="transcriptPreview" style="font-family: var(--font-mono); font-size: 19.5px;"></span>
     </p>
   </div>
 

@@ -9,8 +9,8 @@ from helpers import login_candidate
 class StageRenderCheckTests(TestCase):
     def test_login_pages(self):
         login_html = Client().get(reverse('login')).content.decode()
-        self.assertIn('class="login-page"', login_html)
-        self.assertIn('class="card login-card"', login_html)
+        self.assertIn('class="identity-screen"', login_html)
+        self.assertIn('class="identity-verify-card login-verify-card"', login_html)
         self.assertNotIn('game-stage.css', login_html)
 
         admin_html = Client().get('/admin/login/').content.decode()

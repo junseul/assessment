@@ -1,22 +1,79 @@
 {% extends "base.html" %}
-{% block title %}본인 확인{% endblock %}
+{% block title %}본인 확인 - 역량검사{% endblock %}
+{% load static %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auth-pages.css' %}">
+{% endblock %}
 {% block content %}
-<div style="max-width: 320px; margin: 64px auto 0;">
-  <h1>본인 확인</h1>
-  <p style="margin-bottom: 24px;">역량검사를 시작하기 전에 등록된 정보를 입력해주세요.</p>
-  {% if form.non_field_errors %}
-    <p style="color: #e5484d; font-size: 14px;">{{ form.non_field_errors.0 }}</p>
-  {% endif %}
-  <form method="post">
-    {% csrf_token %}
-    {% for field in form %}
-      <div style="margin-bottom: 16px;">
-        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-        {{ field }}
-        {% for error in field.errors %}<p style="color: #e5484d; font-size: 13px;">{{ error }}</p>{% endfor %}
+<section class="identity-screen">
+  <div class="identity-main">
+    <div class="identity-step">
+      <div class="identity-step-badge">
+        <span class="identity-step-dot" aria-hidden="true"></span>
+        <span>응시자 인증</span>
+        <span class="identity-step-divider">|</span>
+        <span class="identity-step-count">Step 1 of 3</span>
       </div>
-    {% endfor %}
-    <button type="submit" class="btn btn-primary" style="width: 100%;">확인</button>
-  </form>
-</div>
+    </div>
+
+    <div class="identity-verify-card">
+      <div class="identity-heading">
+        <h1>본인 확인</h1>
+        <p>역량검사를 시작하기 전에 등록된 정보를 정확히 입력해주세요.</p>
+      </div>
+
+      {% if form.non_field_errors %}
+        <div class="identity-errors" role="alert">{{ form.non_field_errors.0 }}</div>
+      {% endif %}
+
+      <form class="identity-form" method="post">
+        {% csrf_token %}
+        <div class="identity-field">
+          <label for="{{ form.name.id_for_label }}">이름 <span class="identity-required">*</span></label>
+          <div class="identity-input-wrap">
+            <svg class="identity-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.7-4 3.1-6 7.5-6s6.8 2 7.5 6"></path></svg>
+            {{ form.name }}
+          </div>
+          <p class="identity-help">사전 접수된 실명을 입력해 주세요.</p>
+          {% for error in form.name.errors %}<p class="identity-field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="identity-field">
+          <label for="{{ form.birthdate.id_for_label }}">생년월일 <span class="identity-required">*</span></label>
+          <div class="identity-input-wrap">
+            <svg class="identity-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M3 10h18"></path></svg>
+            {{ form.birthdate }}
+          </div>
+          {% for error in form.birthdate.errors %}<p class="identity-field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="identity-field">
+          <label for="{{ form.phone.id_for_label }}">연락처 <span class="identity-required">*</span></label>
+          <div class="identity-input-wrap">
+            <svg class="identity-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7.2 3.5 10 7.8 8.1 10c1.2 2.6 3.3 4.7 5.9 5.9l2.2-1.9 4.3 2.8-.8 3.2c-.2.7-.8 1.1-1.5 1.1C9.8 20.6 3.4 14.2 2.9 5.8c0-.7.4-1.3 1.1-1.5l3.2-.8Z"></path></svg>
+            {{ form.phone }}
+          </div>
+          <p class="identity-help">숫자 및 하이픈(-)을 포함하여 입력해 주세요.</p>
+          {% for error in form.phone.errors %}<p class="identity-field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="identity-notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6M12 7.5v.5"></path></svg>
+          <span>입력하신 정보는 사전 등록된 응시자 정보와 일치해야 검사가 진행됩니다. 문의사항은 관리자에게 연락 바랍니다.</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary identity-submit">
+          <span>확인</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+        </button>
+      </form>
+    </div>
+
+    <p class="identity-security">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
+      개인정보는 평가 인증 목적으로만 안전하게 처리됩니다.
+    </p>
+  </div>
+  <footer class="identity-footer">© 2025 역량검사 평가 플랫폼. All rights reserved.</footer>
+</section>
 {% endblock %}

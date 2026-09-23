@@ -2,26 +2,44 @@
 {% load static %}
 {% block title %}{{ survey.title }}{% endblock %}
 {% block extra_head %}
-<script src="{% static 'js/traits-start-three.js' %}" defer></script>
+<script src="{% static 'js/traits-start-three.js' %}?v=3" defer></script>
 <style>
   /* 성향파악 시작 카드 — three.js 비주얼과 여백을 포함한 전용 레이아웃 */
   .traits-start-card { overflow: hidden; text-align: center; }
   .traits-start-visual {
+    overflow: hidden;
     position: relative;
-    height: 240px;
+    height: 360px;
     margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) var(--space-6);
     border-bottom: 1px solid var(--color-border-default);
     background: linear-gradient(180deg, #0b1530 0%, #132b5e 60%, var(--color-surface-primary) 100%);
   }
   .traits-start-canvas { position: absolute; inset: 0; }
-  .traits-start-title { font-size: 26px; margin: var(--space-3) 0 var(--space-4); }
+  .traits-start-title { font-size: 39px; margin: var(--space-3) 0 var(--space-4); }
   .traits-start-text { color: var(--color-text-secondary); line-height: 1.6; margin: 0 0 var(--space-2); }
-  .traits-start-btn { margin-top: var(--space-5); min-width: 160px; justify-content: center; }
+  .traits-start-btn { margin-top: var(--space-5); min-width: 240px; justify-content: center; }
+  .traits-survey-shell { max-width: 960px; margin: 40px auto 0; }
+  .traits-start-card { max-width: 960px; margin-inline: auto; }
+  #thanksMsg { max-width: 640px; margin-inline: auto; }
+  #questionPanel .trait-status { grid-template-columns: 1fr 270px; gap: 48px; }
+  #questionPanel .trait-progress-bar, #questionPanel .trait-time-bar { height: 9px; }
+  #questionPanel .trait-question-context { min-height: 300px; }
+  #questionPanel .trait-question-context h2 { max-width: 840px; }
+  #questionPanel .trait-choice { min-height: 180px; }
+  #questionPanel .trait-choice strong { width: 54px; height: 54px; }
+  @media (max-width: 768px) {
+    #questionPanel .trait-status { grid-template-columns: 1fr; gap: 24px; }
+    #questionPanel .trait-question-context { min-height: 240px; padding: 36px 0 24px; }
+    #questionPanel .trait-question-context h2 { font-size: 27px; }
+    #questionPanel .trait-choices { grid-template-columns: 1fr; padding: 18px; }
+    #questionPanel .trait-choice { min-height: 72px; padding: 12px 18px; }
+    #questionPanel .trait-choice strong { width: 48px; height: 48px; flex-basis: 48px; }
+  }
 </style>
 {% endblock %}
 {% block content %}
-<div style="max-width: 640px; margin: 40px auto 0;">
-  <div id="startGate" class="card traits-start-card"{% if already_done %} style="display: none;"{% endif %}>
+<div class="traits-survey-shell">
+  <div id="startGate" class="card traits-start-card ui-size-150"{% if already_done %} style="display: none;"{% endif %}>
     <div id="startThree" class="traits-start-visual" aria-hidden="true"></div>
     <span class="badge badge-primary">성향 파악 검사</span>
     <h1 class="traits-start-title">{{ survey.title }}</h1>
@@ -30,7 +48,7 @@
     <button id="startBtn" class="btn btn-primary traits-start-btn">검사 시작</button>
   </div>
 
-  <div id="questionPanel" class="card" style="display: none;">
+  <div id="questionPanel" class="card ui-size-150" style="display: none;">
     <div class="trait-status">
       <div class="trait-status-item">
         <div class="trait-status-label"><span>진행률</span><strong id="progressText"></strong></div>

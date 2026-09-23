@@ -2,6 +2,7 @@
 import datetime
 
 from django.contrib import admin
+from django.template.response import TemplateResponse
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
@@ -87,3 +88,38 @@ def dashboard_index(request):
         'period_results': period_results,
     }
     return admin.site.index(request, extra_context=extra_context)
+
+def results_analysis_dashboard(request):
+    report_url = reverse('reports:candidate_list')
+    model_specs = [
+        ('Candidate', '지원자 리포트', report_url),
+        ('SurveyResponse', '성향파악 결과', None),
+        ('GameResult', '전략게임 결과', None),
+        ('InterviewResponse', '영상면접 결과', None),
+    ]
+    stats = []
+    for object_name, label, fixed_url in model_specs:
+        model = next(
+            (registered for registered in admin.site._registry
+             if registered._meta.object_name == object_name),
+            None,
+        )
+        url = fixed_url
+        if model is not None and url is None:
+            url = reverse(
+                f'admin:{model._meta.app_label}_{model._meta.model_name}_changelist'
+            )
+        stats.append({
+            'label': label,
+            'count': model.objects.count() if model is not None else 0,
+            'url': url,
+        })
+    context = {
+        **admin.site.each_context(request),
+        'title': '결과 분석 관리 대시보드',
+        'dashboard_title': '결과 분석 관리 대시보드',
+        'dashboard_description': '지원자별 검사 결과와 종합 리포트를 확인합니다.',
+        'result_stats': stats,
+        'report_url': report_url,
+    }
+    return TemplateResponse(request, 'admin/results_analysis_dashboard.html', context)

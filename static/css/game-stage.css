@@ -83,6 +83,15 @@ html.game-stage .game-hub {
   z-index: 1;
 }
 
+/* 시작 카드와 실제 게임을 같은 1.5배 스테이지로 표시한다. */
+.page > [class$="-wrap"] { width: min(960px, calc(100vw - 48px)); max-width: none; }
+#startGate, #playArea {
+  width: calc(100% / 1.5);
+  transform: scale(1.5);
+  transform-origin: top left;
+}
+#thanksMsg { max-width: 640px; margin-inline: auto; }
+
 /* 게임 콘솔 프레임: HUD와 게임 표면을 감싸는 패널 */
 html.game-stage #playArea {
   position: relative;

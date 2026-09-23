@@ -1,8 +1,8 @@
-/* 영상면접 시작 화면 장식용 three.js 비주얼.
-   녹화·제출 로직에는 관여하지 않는 표시 계층이다.
-   WebGL을 사용할 수 없으면 아무 표시 없이 기본 화면으로 진행한다. */
+/* interview start-screen image animation rendered with Three.js. */
 (() => {
-  const moduleUrl = new URL('../vendor/three/three.module.js', document.currentScript.src);
+  const scriptUrl = document.currentScript.src;
+  const moduleUrl = new URL('../vendor/three/three.module.js', scriptUrl);
+  const imageUrl = new URL('../images/assessment/interview-video-hero.png', scriptUrl);
   const gate = document.getElementById('startGate');
   const host = document.getElementById('interviewThree');
   if (!gate || !host) return;
@@ -23,187 +23,153 @@
 
   function fallback(error) {
     release();
-    console.warn('Three.js start visual unavailable:', error);
+    console.warn('Three.js interview visual unavailable:', error);
   }
 
-  import(moduleUrl.href).then(THREE => {
+  import(moduleUrl.href).then(async THREE => {
     if (stopped) return;
     renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.className = 'interview-start-canvas';
     renderer.domElement.setAttribute('aria-hidden', 'true');
-    renderer.domElement.addEventListener('webglcontextlost', event => {
-      event.preventDefault();
-      fallback('WebGL context lost');
-    }, { once: true });
     host.append(renderer.domElement);
 
+    const texture = keep(await new THREE.TextureLoader().loadAsync(imageUrl.href));
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const uniforms = {
+      uTexture: { value: texture },
+      uResolution: { value: new THREE.Vector2(1, 1) },
+      uImageSize: { value: new THREE.Vector2(texture.image.width, texture.image.height) },
+      uPointer: { value: new THREE.Vector2() },
+      uTime: { value: 0 },
+    };
+    const material = keep(new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader: [
+        'varying vec2 vUv;',
+        'void main() { vUv = uv; gl_Position = vec4(position, 1.0); }',
+      ].join('\n'),
+      fragmentShader: [
+        'uniform sampler2D uTexture;',
+        'uniform vec2 uResolution, uImageSize, uPointer;',
+        'uniform float uTime;',
+        'varying vec2 vUv;',
+        'void main() {',
+        '  float screenRatio = uResolution.x / uResolution.y;',
+        '  float imageRatio = uImageSize.x / uImageSize.y;',
+        '  vec2 cover = screenRatio < imageRatio ? vec2(screenRatio / imageRatio, 1.0) : vec2(1.0, imageRatio / screenRatio);',
+        '  float breath = 0.977 + sin(uTime * 0.42) * 0.006;',
+        '  vec2 uv = (vUv - 0.5) * cover * breath + 0.5 - uPointer * vec2(0.013, 0.018);',
+        '  uv += vec2(sin(uv.y * 12.0 + uTime * 1.1), cos(uv.x * 10.0 - uTime * 0.9)) * 0.0035;',
+        '  vec3 color = texture2D(uTexture, uv).rgb;',
+        '  float sweepX = fract(uTime * 0.11) * 1.5 - 0.25;',
+        '  float sheen = smoothstep(0.19, 0.0, abs(vUv.x - sweepX));',
+        '  float cameraGlow = 1.0 - smoothstep(0.0, 0.12, distance(vUv, vec2(0.67, 0.30) + uPointer * 0.02));',
+        '  float signal = 0.5 + 0.5 * sin(uTime * 2.2);',
+        '  color += vec3(0.28, 0.60, 1.0) * (cameraGlow * signal * 0.14 + sheen * 0.075);',
+        '  float scanY = fract(uTime * 0.23);',
+        '  float screenMask = step(0.46, vUv.x) * step(vUv.x, 0.86) * step(0.20, vUv.y) * step(vUv.y, 0.78);',
+        '  float scanLine = smoothstep(0.022, 0.0, abs(vUv.y - scanY)) * screenMask;',
+        '  color += vec3(0.25, 0.76, 1.0) * scanLine * 0.16;',
+        '  gl_FragColor = vec4(color, 1.0);',
+        '}',
+      ].join('\n'),
+    }));
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-    camera.position.set(0, 0.85, 5.6);
-    camera.lookAt(0, -0.15, 0);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x8a97ab, 1.5));
-    const light = new THREE.DirectionalLight(0xffffff, 2);
-    light.position.set(-3, 5, 6);
-    scene.add(light);
-
-    const aluminum = keep(new THREE.MeshStandardMaterial({
-      color: 0x9aa7bd, roughness: 0.35, metalness: 0.7,
+    scene.add(new THREE.Mesh(keep(new THREE.PlaneGeometry(2, 2)), material));
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 2);
+    camera.position.z = 1;
+    const waveGroup = new THREE.Group();
+    waveGroup.position.set(-0.18, 0.30, 0.2);
+    const waveGeometry = keep(new THREE.PlaneGeometry(0.014, 0.13));
+    const waveMaterial = keep(new THREE.MeshBasicMaterial({
+      color: 0x7ee8ff, transparent: true, opacity: 0.82, depthTest: false,
+      blending: THREE.AdditiveBlending,
     }));
-    const darkTrim = keep(new THREE.MeshStandardMaterial({
-      color: 0x1e293b, roughness: 0.5, metalness: 0.4,
-    }));
-    const screenGlow = keep(new THREE.MeshBasicMaterial({ color: 0x0d1b3e }));
-
-    // 노트북 본체
-    const laptop = new THREE.Group();
-    scene.add(laptop);
-
-    const base = new THREE.Mesh(keep(new THREE.BoxGeometry(4.3, 0.16, 2.9)), aluminum);
-    base.position.set(0, -1.25, 0.35);
-    laptop.add(base);
-    const deck = new THREE.Mesh(keep(new THREE.BoxGeometry(3.9, 0.03, 2.3)), darkTrim);
-    deck.position.set(0, -1.16, 0.42);
-    laptop.add(deck);
-    const trackpad = new THREE.Mesh(keep(new THREE.BoxGeometry(1.15, 0.035, 0.75)), aluminum);
-    trackpad.position.set(0, -1.14, 1.2);
-    laptop.add(trackpad);
-
-    // 자판: 4행 키 매트릭스
-    const keyMat = keep(new THREE.MeshStandardMaterial({
-      color: 0x334155, roughness: 0.55, metalness: 0.2,
-    }));
-    const keys = [];
-    for (let row = 0; row < 4; row += 1) {
-      for (let col = 0; col < 10; col += 1) {
-        const key = new THREE.Mesh(keep(new THREE.BoxGeometry(0.26, 0.05, 0.26)), keyMat);
-        key.position.set(-1.48 + col * 0.33, -1.11, -0.45 + row * 0.33);
-        key.userData.phase = (row * 10 + col) * 0.37;
-        laptop.add(key);
-        keys.push(key);
-      }
-    }
-
-    const lid = new THREE.Group();
-    lid.position.set(0, -1.17, -1.0);
-    lid.rotation.x = -0.28;
-    laptop.add(lid);
-    const lidBack = new THREE.Mesh(keep(new THREE.BoxGeometry(4.3, 2.9, 0.12)), aluminum);
-    lidBack.position.y = 1.45;
-    lid.add(lidBack);
-    const screen = new THREE.Mesh(keep(new THREE.PlaneGeometry(3.9, 2.5)), screenGlow);
-    screen.position.set(0, 1.45, 0.07);
-    lid.add(screen);
-
-    // 웹캠 표시등
-    const camLampMat = keep(new THREE.MeshBasicMaterial({ color: 0x22c55e }));
-    const camLamp = new THREE.Mesh(keep(new THREE.SphereGeometry(0.045, 16, 12)), camLampMat);
-    camLamp.position.set(0, 2.78, 0.08);
-    lid.add(camLamp);
-
-    // 화면 속 화상면접 UI: 상대방 비디오와 자막 바, 녹화 배지
-    const ui = new THREE.Group();
-    ui.position.set(0, 1.45, 0.075);
-    lid.add(ui);
-    const meWindow = new THREE.Mesh(
-      keep(new THREE.PlaneGeometry(1.1, 0.75)),
-      keep(new THREE.MeshBasicMaterial({ color: 0x1e3a8a })),
-    );
-    meWindow.position.set(-1.2, -0.8, 0.01);
-    ui.add(meWindow);
-
-    // 자막 바 5개
-    const barGeo = keep(new THREE.PlaneGeometry(1, 0.09));
-    const bars = [];
-    const barColors = [0x38bdf8, 0x38bdf8, 0x64748b, 0x38bdf8, 0x64748b];
-    const barWidths = [2.35, 2.05, 1.5, 2.2, 1.7];
-    barColors.forEach((color, index) => {
-      const bar = new THREE.Mesh(barGeo, keep(new THREE.MeshBasicMaterial({ color })));
-      bar.position.set(-1.7 + barWidths[index] / 2, -0.58 + index * 0.16, 0.01);
-      bar.scale.x = barWidths[index];
-      bar.userData.width = barWidths[index];
-      ui.add(bar);
-      bars.push(bar);
+    const waveBars = Array.from({ length: 13 }, (_, index) => {
+      const bar = new THREE.Mesh(waveGeometry, waveMaterial);
+      bar.position.x = (index - 6) * 0.032;
+      bar.userData.phase = index * 0.68;
+      waveGroup.add(bar);
+      return bar;
     });
-
-    // REC 배지
-    const recBadge = new THREE.Mesh(
-      keep(new THREE.PlaneGeometry(0.62, 0.3)),
-      keep(new THREE.MeshBasicMaterial({ color: 0xef4444 })),
-    );
-    recBadge.position.set(1.5, 1.02, 0.01);
-    ui.add(recBadge);
-    const recBadgeMat = recBadge.material;
-
-    // 오디오 레벨 바
-    const levelBars = [];
-    const levelGeo = keep(new THREE.BoxGeometry(0.09, 1, 0.02));
-    const levelMat = keep(new THREE.MeshBasicMaterial({ color: 0x22c55e }));
-    for (let i = 0; i < 9; i += 1) {
-      const level = new THREE.Mesh(levelGeo, levelMat);
-      level.position.set(1.05 + i * 0.14, -0.95, 0.01);
-      level.userData.phase = i * 0.65;
-      ui.add(level);
-      levelBars.push(level);
-    }
-
-    // 바닥 그림자
-    const shadowMaterial = keep(new THREE.MeshBasicMaterial({
-      color: 0x1e3a8a, transparent: true, opacity: 0.13, depthWrite: false,
+    scene.add(waveGroup);
+    const cameraPulseMaterial = keep(new THREE.MeshBasicMaterial({
+      color: 0x78dfff, transparent: true, opacity: 0.72, depthTest: false,
+      blending: THREE.AdditiveBlending,
     }));
-    const laptopShadow = new THREE.Mesh(keep(new THREE.CircleGeometry(1.7, 48)), shadowMaterial);
-    laptopShadow.rotation.x = -Math.PI / 2;
-    laptopShadow.position.set(0, -1.36, 0.2);
-    laptopShadow.scale.set(1.3, 0.55, 1);
-    scene.add(laptopShadow);
+    const cameraPulse = new THREE.Mesh(
+      keep(new THREE.RingGeometry(0.035, 0.052, 48, 1, 0, Math.PI * 1.55)), cameraPulseMaterial,
+    );
+    cameraPulse.position.set(0.34, 0.42, 0.2);
+    scene.add(cameraPulse);
+    const particleGeometry = keep(new THREE.CircleGeometry(0.009, 16));
+    const interviewParticles = Array.from({ length: 18 }, (_, index) => {
+      const particleMaterial = keep(new THREE.MeshBasicMaterial({
+        color: index % 3 === 0 ? 0xffd7b0 : 0x9eeaff,
+        transparent: true, opacity: 0.42, depthTest: false,
+        blending: THREE.AdditiveBlending,
+      }));
+      const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+      particle.position.set(-0.9 + (index % 9) * 0.225, -0.58 + Math.floor(index / 9) * 1.12, 0.18);
+      particle.userData.baseX = particle.position.x;
+      particle.userData.baseY = particle.position.y;
+      particle.userData.phase = index * 0.73;
+      scene.add(particle);
+      return { particle, particleMaterial };
+    });
+    const targetPointer = new THREE.Vector2();
+    host.addEventListener('pointermove', event => {
+      const rect = host.getBoundingClientRect();
+      targetPointer.set(
+        (event.clientX - rect.left) / rect.width - 0.5,
+        0.5 - (event.clientY - rect.top) / rect.height,
+      );
+    });
+    host.addEventListener('pointerleave', () => targetPointer.set(0, 0));
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const motionFactor = reduced ? 0.28 : 1;
     let width = 0, height = 0;
-    function frameCamera() {
-      const aspect = width / Math.max(height, 1);
-      camera.aspect = aspect;
-      camera.position.z = aspect < 1.1 ? 8.0 : aspect < 1.6 ? 6.6 : 5.6;
-      camera.updateProjectionMatrix();
-    }
-
     function draw(time = 0) {
-      // 카메라 준비로 게이트가 숨겨지면 렌더링을 멈춘다.
       if (stopped || !gate.isConnected || gate.offsetParent === null) { release(); return; }
-      try {
-        const bounds = host.getBoundingClientRect();
-        if (!bounds.width || !bounds.height) return;
-        if (width !== bounds.width || height !== bounds.height) {
-          width = bounds.width; height = bounds.height;
-          renderer.setSize(width, height);
-          frameCamera();
-        }
-        const t = time / 1000;
-        laptop.rotation.y = Math.sin(t * 0.22) * 0.06;
-        lid.rotation.x = -0.28 + Math.sin(t * 0.4) * 0.008;
-        for (const key of keys) {
-          key.position.y = -1.11 + Math.max(0, Math.sin(t * 2.2 + key.userData.phase)) * 0.035;
-        }
-        for (const bar of bars) {
-          const target = bar.userData.width * (0.55 + 0.45 * Math.abs(Math.sin(t * 1.4 + bar.userData.width)));
-          bar.scale.x += (target - bar.scale.x) * 0.08;
-          bar.position.x = -1.7 + bar.scale.x / 2;
-        }
-        for (const level of levelBars) {
-          const heightScale = 0.15 + 0.85 * Math.abs(Math.sin(t * 3.1 + level.userData.phase));
-          level.scale.y = heightScale * 0.42;
-          level.position.y = -0.95 + (level.scale.y / 2);
-        }
-        camLampMat.color.setHex(Math.sin(t * 2.4) > 0 ? 0x22c55e : 0x14532d);
-        recBadgeMat.color.setHex(Math.sin(t * 4.2) > 0 ? 0xef4444 : 0x7f1d1d);
-        renderer.render(scene, camera);
-      } catch (error) { fallback(error); }
+      const nextWidth = host.clientWidth;
+      const nextHeight = host.clientHeight;
+      if (!nextWidth || !nextHeight) return;
+      if (width !== nextWidth || height !== nextHeight) {
+        width = nextWidth;
+        height = nextHeight;
+        const rect = host.getBoundingClientRect();
+        const displayScale = Math.max(rect.width / width, rect.height / height, 1);
+        renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * displayScale, 3));
+        renderer.setSize(width, height);
+        uniforms.uResolution.value.set(width, height);
+      }
+      const seconds = time / 1000 * motionFactor;
+      uniforms.uPointer.value.lerp(targetPointer, 0.035);
+      uniforms.uTime.value = seconds;
+      waveBars.forEach((bar, index) => {
+        bar.scale.y = 0.35 + Math.abs(Math.sin(seconds * 3.8 + bar.userData.phase)) * (0.7 + (index % 3) * 0.2);
+      });
+      waveGroup.position.y = 0.30 + Math.sin(seconds * 1.4) * 0.025;
+      waveGroup.scale.x = 1 + Math.sin(seconds * 1.1) * 0.08;
+      const pulse = 1 + (Math.sin(seconds * 3.2) + 1) * 0.48;
+      cameraPulse.scale.setScalar(pulse);
+      cameraPulse.rotation.z = seconds * 1.8;
+      cameraPulseMaterial.opacity = 0.86 - (pulse - 1) * 0.52;
+      interviewParticles.forEach(({ particle, particleMaterial }, index) => {
+        particle.position.x = particle.userData.baseX + Math.sin(seconds * 0.8 + particle.userData.phase) * 0.028;
+        particle.position.y = particle.userData.baseY + Math.cos(seconds * 1.25 + particle.userData.phase) * 0.055;
+        const twinkle = 0.25 + Math.abs(Math.sin(seconds * 2.6 + particle.userData.phase)) * 0.65;
+        particle.scale.setScalar(0.7 + twinkle * 0.8);
+        particleMaterial.opacity = twinkle;
+      });
+      renderer.render(scene, camera);
     }
 
-    if (reduced) {
-      draw(1800);
-    } else {
-      renderer.setAnimationLoop(draw);
-    }
+    renderer.setAnimationLoop(draw);
     observer = new MutationObserver(() => { if (gate.style.display === 'none') release(); });
     observer.observe(gate, { attributes: true, attributeFilter: ['style'] });
   }).catch(fallback);

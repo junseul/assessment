@@ -238,6 +238,10 @@ class DroneTrackingTests(TestCase):
         response = self.client.get(reverse('games:play', args=[self.slug]))
         self.assertContains(response, 'motArena')
         self.assertContains(response, 'target-highlight')
+        self.assertNotContains(response, 'linear-gradient(rgba(0, 0, 0, .035)')
+        renderer = (settings.BASE_DIR / 'static' / 'js' / 'game-three.js').read_text(encoding='utf-8')
+        self.assertIn("document.getElementById('motArena')", renderer)
+        self.assertIn('new THREE.CanvasTexture(skyCanvas)', renderer)
 
     def test_submit_ok(self):
         response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')
@@ -260,6 +264,9 @@ class CipherLabTests(TestCase):
         self.assertContains(response, 'plugin-html-keyboard-response')
         self.assertContains(response, 'cipher-option-btn')
         self.assertContains(response, 'cipher-panel')
+        self.assertContains(response, "[['rotation', 'count'], ['rotation', 'size']]")
+        renderer = (settings.BASE_DIR / 'static' / 'js' / 'game-three.js').read_text(encoding='utf-8')
+        self.assertNotIn('.cipher-panel > span > span', renderer)
 
     def test_submit_ok(self):
         response = self.client.post(self.url, data=json.dumps(self.payload), content_type='application/json')

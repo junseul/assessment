@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from games.models import GameResult
 from helpers import make_candidate
@@ -48,6 +49,33 @@ class AdminDashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'admin-login-card')
         self.assertContains(response, '관리자 로그인')
+
+    def test_app_dashboards_use_category_titles(self):
+        cases = [
+            ('/admin/auth/', '계정 관리 대시보드'),
+            ('/admin/invites/', '초대 관리 대시보드'),
+            ('/admin/traits/', '성향파악 관리 대시보드'),
+            ('/admin/games/', '전략게임 관리 대시보드'),
+            ('/admin/interviews/', '영상면접 관리 대시보드'),
+        ]
+        for url, title in cases:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, f'<h1>{title}</h1>')
+                if url != '/admin/auth/':
+                    today = timezone.localdate()
+                    self.assertContains(response, f'value="{today:%Y}0101"')
+                    self.assertContains(response, f'value="{today:%Y%m%d}"')
+
+    def test_results_analysis_has_admin_dashboard(self):
+        response = self.client.get(reverse('admin_results_analysis'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<h1>결과 분석 관리 대시보드</h1>')
+        self.assertContains(response, '성향파악 결과')
+        self.assertContains(response, '전략게임 결과')
+        self.assertContains(response, '영상면접 결과')
+        self.assertContains(response, reverse('reports:candidate_list'))
 
     def test_candidate_admin_has_search_filter_and_fieldsets(self):
         response = self.client.get('/admin/invites/candidate/')
@@ -110,6 +138,27 @@ class RootRedirectTests(TestCase):
     def test_root_redirects_to_login(self):
         response = self.client.get('/')
         self.assertRedirects(response, reverse('login'))
+
+    def test_login_uses_shared_identity_design_and_authenticates(self):
+        response = self.client.get(reverse('login'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'css/auth-pages.css')
+        self.assertContains(response, 'identity-verify-card login-verify-card')
+        self.assertContains(response, 'HR 인증')
+        self.assertContains(response, 'name="username"')
+        self.assertContains(response, 'name="password"')
+
+        User.objects.create_user(username='hr-login', password='pass')
+        response = self.client.post(reverse('login'), {
+            'username': 'hr-login',
+            'password': 'pass',
+            'next': reverse('reports:candidate_list'),
+        })
+        self.assertRedirects(
+            response,
+            reverse('reports:candidate_list'),
+            fetch_redirect_response=False,
+        )
 
 
 class ReportTests(TestCase):

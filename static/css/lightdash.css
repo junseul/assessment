@@ -296,6 +296,43 @@ label { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); 
 .card-title { font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
 .card-body { color: var(--color-text-secondary); font-size: var(--font-size-base); }
 
+/* zoom 없이 기존 1.5배 UI 크기를 유지하는 명시적 크기 토큰 */
+.ui-size-150 {
+  --font-size-xs: 1.125rem;
+  --font-size-sm: 1.21875rem;
+  --font-size-base: 1.3125rem;
+  --font-size-md: 1.5rem;
+  --font-size-lg: 1.6875rem;
+  --font-size-xl: 1.875rem;
+  --font-size-2xl: 2.25rem;
+  --font-size-3xl: 2.8125rem;
+  --space-1: 0.375rem;
+  --space-2: 0.75rem;
+  --space-3: 1.125rem;
+  --space-4: 1.5rem;
+  --space-5: 1.875rem;
+  --space-6: 2.25rem;
+  --space-8: 3rem;
+  --space-10: 3.75rem;
+  --space-12: 4.5rem;
+  --space-16: 6rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1.125rem;
+  --height-sm: 3rem;
+  --height-md: 3.75rem;
+  --height-lg: 4.5rem;
+  width: 100%;
+  font-size: var(--font-size-base);
+  border-width: 1.5px;
+}
+
+.ui-size-150 .badge { height: 33px; }
+.ui-size-150 .btn,
+.ui-size-150 .trait-choices,
+.ui-size-150 .trait-choice { border-width: 1.5px; }
+
 section.module {
   background: var(--color-surface-primary);
   border: 1px solid var(--color-border-default);

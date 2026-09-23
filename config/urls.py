@@ -22,7 +22,7 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 
 from . import admin_labels  # noqa: F401 — apply Korean admin menu labels
-from .admin_views import dashboard_index
+from .admin_views import dashboard_index, results_analysis_dashboard
 
 admin.site.site_header = 'AI 역량검사 관리자'
 admin.site.site_title = 'AI 역량검사 관리자'
@@ -33,6 +33,11 @@ urlpatterns = [
     path('', RedirectView.as_view(pattern_name='login', permanent=False)),
     # /admin/ 대시보드만 기간 조회가 추가된 커스텀 뷰로 처리한다.
     path('admin/', admin.site.admin_view(dashboard_index)),
+    path(
+        'admin/results-analysis/',
+        admin.site.admin_view(results_analysis_dashboard),
+        name='admin_results_analysis',
+    ),
     path('admin/', admin.site.urls),
     path('accounts/login/', auth_views.LoginView.as_view(), name='login'),
     path('accounts/logout/', auth_views.LogoutView.as_view(), name='logout'),

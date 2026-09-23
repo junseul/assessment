@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -30,9 +31,21 @@ class InterviewSubmitTests(TestCase):
     def test_start_gate_has_three_visual_and_spaced_layout(self):
         response = self.client.get(reverse('interviews:interview_detail'))
         self.assertContains(response, 'id="interviewThree"')
-        self.assertContains(response, 'js/interviews-start-three.js')
+        self.assertContains(response, 'js/interviews-start-three.js?v=3')
         self.assertContains(response, 'interview-start-card')
         self.assertContains(response, 'interview-start-btn')
+        self.assertContains(response, 'interview-start-card ui-size-150')
+        self.assertContains(response, 'id="interviewPanel" class="card ui-size-150"')
+        self.assertNotContains(response, 'zoom: 1.5')
+        visual = (settings.BASE_DIR / 'static' / 'js' / 'interviews-start-three.js').read_text(encoding='utf-8')
+        self.assertIn('interview-video-hero.png', visual)
+        self.assertIn('new THREE.ShaderMaterial', visual)
+        self.assertIn('const waveBars =', visual)
+        self.assertIn('const interviewParticles =', visual)
+        self.assertIn('const motionFactor = reduced ? 0.28 : 1', visual)
+        self.assertIn('renderer.setAnimationLoop(draw)', visual)
+        self.assertIn('const displayScale =', visual)
+        self.assertTrue((settings.BASE_DIR / 'static' / 'images' / 'assessment' / 'interview-video-hero.png').is_file())
 
     def test_invalid_file_rejected(self):
         response = self.client.post(self.url, {

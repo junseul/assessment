@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
 
@@ -55,9 +56,23 @@ class SurveySubmitTests(TestCase):
     def test_start_gate_has_three_visual_and_spaced_layout(self):
         response = self.client.get(reverse('traits:survey_detail', args=[self.survey.pk]))
         self.assertContains(response, 'id="startThree"')
-        self.assertContains(response, 'js/traits-start-three.js')
+        self.assertContains(response, 'js/traits-start-three.js?v=3')
         self.assertContains(response, 'traits-start-card')
         self.assertContains(response, 'traits-start-btn')
+        self.assertContains(response, 'traits-start-card ui-size-150')
+        self.assertContains(response, 'id="questionPanel" class="card ui-size-150"')
+        self.assertNotContains(response, 'zoom: 1.5')
+        visual = (settings.BASE_DIR / 'static' / 'js' / 'traits-start-three.js').read_text(encoding='utf-8')
+        self.assertIn('traits-personality-hero.png', visual)
+        self.assertIn('new THREE.ShaderMaterial', visual)
+        self.assertIn('const traitAccents = [', visual)
+        self.assertIn('float sparkle =', visual)
+        self.assertIn('haloMaterial.opacity', visual)
+        self.assertIn('const motionFactor = reduced ? 0.28 : 1', visual)
+        self.assertIn('group.userData.baseY', visual)
+        self.assertIn('renderer.setAnimationLoop(draw)', visual)
+        self.assertIn('const displayScale =', visual)
+        self.assertTrue((settings.BASE_DIR / 'static' / 'images' / 'assessment' / 'traits-personality-hero.png').is_file())
 
     def test_page_is_frameable_from_same_origin(self):
         # Admin's local-test iframe (invites.views.local_test) embeds this

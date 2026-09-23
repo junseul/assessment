@@ -72,7 +72,6 @@
       return keep(new THREE.ExtrudeGeometry(outline, { depth: 0.08, bevelEnabled: false }));
     }
     const aircraft = shape([[0,.43],[.08,.12],[.38,-.12],[.38,-.2],[.08,-.12],[.07,-.32],[.2,-.4],[.2,-.46],[0,-.4],[-.2,-.46],[-.2,-.4],[-.07,-.32],[-.08,-.12],[-.38,-.2],[-.38,-.12],[-.08,.12]]);
-    const arrow = shape([[-.45,-.14],[.08,-.14],[.08,-.4],[.48,0],[.08,.4],[.08,.14],[-.45,.14]]);
     const glyphs = new Map();
     for (const char of '123456789★') {
       const canvas = document.createElement('canvas');
@@ -100,6 +99,42 @@
     const shadowMap = keep(new THREE.CanvasTexture(shadowCanvas));
     shadowMap.colorSpace = THREE.SRGBColorSpace;
     const shadowMaterial = keep(new THREE.MeshBasicMaterial({ map: shadowMap, transparent: true, depthWrite: false }));
+    const droneArena = document.getElementById('motArena');
+    let droneSky = null;
+    if (droneArena) {
+      const skyCanvas = document.createElement('canvas');
+      skyCanvas.width = 960;
+      skyCanvas.height = 576;
+      const skyContext = skyCanvas.getContext('2d');
+      const skyGradient = skyContext.createLinearGradient(0, 0, 0, skyCanvas.height);
+      skyGradient.addColorStop(0, '#55a9e8');
+      skyGradient.addColorStop(0.65, '#b9e4fa');
+      skyGradient.addColorStop(1, '#eefaff');
+      skyContext.fillStyle = skyGradient;
+      skyContext.fillRect(0, 0, skyCanvas.width, skyCanvas.height);
+
+      const sunGradient = skyContext.createRadialGradient(770, 105, 8, 770, 105, 78);
+      sunGradient.addColorStop(0, 'rgba(255, 248, 199, .95)');
+      sunGradient.addColorStop(1, 'rgba(255, 248, 199, 0)');
+      skyContext.fillStyle = sunGradient;
+      skyContext.fillRect(680, 15, 180, 180);
+
+      skyContext.fillStyle = 'rgba(255, 255, 255, .76)';
+      [[150, 150, 1], [470, 95, .72], [720, 250, 1.15], [340, 330, .88]].forEach(([x, y, scale]) => {
+        skyContext.beginPath();
+        skyContext.ellipse(x - 46 * scale, y + 8 * scale, 68 * scale, 24 * scale, 0, 0, Math.PI * 2);
+        skyContext.ellipse(x, y - 8 * scale, 58 * scale, 34 * scale, 0, 0, Math.PI * 2);
+        skyContext.ellipse(x + 58 * scale, y + 10 * scale, 74 * scale, 25 * scale, 0, 0, Math.PI * 2);
+        skyContext.fill();
+      });
+
+      const skyMap = keep(new THREE.CanvasTexture(skyCanvas));
+      skyMap.colorSpace = THREE.SRGBColorSpace;
+      droneSky = new THREE.Mesh(plane, keep(new THREE.MeshBasicMaterial({ map: skyMap, depthWrite: false })));
+      droneSky.position.z = -20;
+      droneSky.renderOrder = -1;
+      scene.add(droneSky);
+    }
     function mesh(group, geometry, color, scale, position = [0,0,0], flat = false) {
       const object = new THREE.Mesh(geometry, material(color, flat));
       object.scale.set(...scale);
@@ -107,7 +142,7 @@
       group.add(object);
       return object;
     }
-    const selector = '.radar-target, .brake-box, .sort-item, .drone, .search-item, .cipher-panel > span > span, .rsvp-item, #ssStim, .three-exp-site';
+    const selector = '.radar-target, .brake-box, .sort-item, .drone, .search-item, .rsvp-item, #ssStim, .three-exp-site';
     function create(el) {
       const group = new THREE.Group();
       let signal, outline, glyph;
@@ -146,8 +181,6 @@
         glyph.scale.set(.95,.95,1);
         glyph.position.z = .1;
         group.add(glyph);
-      } else if (el.matches('.cipher-panel > span > span')) {
-        signal = mesh(group, arrow, '#2f6fed', [1,1,1]);
       } else {
         const css = getComputedStyle(el);
         const circular = css.borderRadius === '50%';
@@ -164,7 +197,7 @@
 
     // Compile before the first timed trial, including the fast RSVP/glyph materials.
     const warm = new THREE.Group();
-    for (const geometry of [box, disc, ring, aircraft, arrow, cone, plane]) {
+    for (const geometry of [box, disc, ring, aircraft, cone, plane]) {
       mesh(warm, geometry, '#2f6fed', [1,1,1]);
       mesh(warm, geometry, '#2f6fed', [1,1,1], [0,0,0], true);
     }
@@ -182,11 +215,24 @@
       try {
         const bounds = area.getBoundingClientRect();
         if (!bounds.width || !bounds.height) return;
-        if (width !== bounds.width || height !== bounds.height) {
-          width = bounds.width; height = bounds.height;
+        const nextWidth = area.clientWidth;
+        const nextHeight = area.clientHeight;
+        if (!nextWidth || !nextHeight) return;
+        if (width !== nextWidth || height !== nextHeight) {
+          width = nextWidth; height = nextHeight;
           renderer.setSize(width, height);
           camera.right = width; camera.top = height;
           camera.updateProjectionMatrix();
+        }
+        const canvasBounds = renderer.domElement.getBoundingClientRect();
+        const scaleX = canvasBounds.width / width;
+        const scaleY = canvasBounds.height / height;
+        if (droneSky) {
+          const skyRect = droneArena.getBoundingClientRect();
+          droneSky.visible = !!skyRect.width && !!skyRect.height;
+          droneSky.scale.set(droneArena.clientWidth, droneArena.clientHeight, 1);
+          droneSky.position.x = (skyRect.left - canvasBounds.left + skyRect.width / 2) / scaleX;
+          droneSky.position.y = height - (skyRect.top - canvasBounds.top + skyRect.height / 2) / scaleY;
         }
         for (const [el, entry] of entries) if (!area.contains(el)) {
           scene.remove(entry.group);
@@ -203,17 +249,22 @@
             group.visible = group.visible && glyphs.has(el.textContent.trim());
             if (group.visible) glyph.material = glyphs.get(el.textContent.trim());
           }
-          const size = el.matches('.cipher-panel > span > span, #ssStim') ? parseFloat(css.fontSize) : null;
+          const size = el.id === 'ssStim' ? parseFloat(css.fontSize) : null;
           group.scale.set(size || el.offsetWidth, size || el.offsetHeight, Math.min(size || el.offsetWidth, size || el.offsetHeight));
-          group.position.set(rect.left - bounds.left + rect.width / 2, height - (rect.top - bounds.top + rect.height / 2), 0);
+          group.position.set(
+            (rect.left - canvasBounds.left + rect.width / 2) / scaleX,
+            height - (rect.top - canvasBounds.top + rect.height / 2) / scaleY,
+            0,
+          );
           // CSS's clockwise rotation becomes counterclockwise in world coordinates.
           if (css.transform !== 'none' && !el.matches('.radar-target')) {
             const matrix = new DOMMatrixReadOnly(css.transform);
             group.rotation.z = -Math.atan2(matrix.b, matrix.a);
           }
           if (signal) {
-            const color = el.matches('.radar-target') ? (el.classList.contains('danger') ? '#e5484d' : '#22a06b')
-              : el.matches('.cipher-panel > span > span') ? css.color : css.backgroundColor;
+            const color = el.matches('.radar-target')
+              ? (el.classList.contains('danger') ? '#e5484d' : '#22a06b')
+              : css.backgroundColor;
             signal.material = material(color, el.matches('.rsvp-item'));
           }
           if (outline) {

@@ -30,6 +30,14 @@ class VerifyTests(TestCase):
         self.assertContains(response, '일치하지 않습니다')
         self.assertIsNone(self.client.session.get('candidate_id'))
 
+    def test_verification_page_uses_identity_card_layout(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, 'identity-verify-card')
+        self.assertContains(response, '응시자 인증')
+        self.assertContains(response, 'Step 1 of 3')
+        self.assertContains(response, 'placeholder="홍길동"')
+        self.assertContains(response, 'placeholder="010-1234-5678"')
+
     def test_phone_digits_match(self):
         response = self.client.post(self.url, {
             'name': '홍길동',

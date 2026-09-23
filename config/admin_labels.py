@@ -3,6 +3,7 @@ from types import MethodType
 
 from django.contrib import admin
 from django.urls import reverse
+from django.utils import timezone
 
 APP_NAMES = {
     'invites': '초대 관리',
@@ -10,6 +11,14 @@ APP_NAMES = {
     'games': '전략게임',
     'interviews': '영상면접',
     'auth': '계정',
+}
+
+APP_DASHBOARD_TITLES = {
+    'auth': '계정 관리 대시보드',
+    'invites': '초대 관리 대시보드',
+    'traits': '성향파악 관리 대시보드',
+    'games': '전략게임 관리 대시보드',
+    'interviews': '영상면접 관리 대시보드',
 }
 
 MODEL_NAMES = {
@@ -35,6 +44,7 @@ MODEL_ORDER = {
 }
 
 _original_get_app_list = admin.AdminSite.get_app_list
+_original_app_index = admin.AdminSite.app_index
 
 
 class AdminTitleMixin:
@@ -58,7 +68,7 @@ def _results_analysis_app():
     return {
         'app_label': 'results-analysis',
         'name': '결과 분석',
-        'app_url': report_url,
+        'app_url': reverse('admin_results_analysis'),
         'models': [
             {
                 'name': '지원자 리포트',
@@ -96,3 +106,22 @@ def _get_app_list(self, request, app_label=None):
 
 
 admin.site.get_app_list = MethodType(_get_app_list, admin.site)
+
+
+def _app_index(self, request, app_label, extra_context=None):
+    context = {
+        'dashboard_title': APP_DASHBOARD_TITLES.get(app_label, '관리 대시보드'),
+        'dashboard_description': f'{APP_NAMES.get(app_label, app_label)} 항목을 관리합니다.',
+        **(extra_context or {}),
+    }
+    if app_label in {'invites', 'traits', 'games', 'interviews'}:
+        today = timezone.localdate()
+        context['period_start'] = (
+            request.GET.get('start')
+            or today.replace(month=1, day=1).strftime('%Y%m%d')
+        )
+        context['period_end'] = request.GET.get('end') or today.strftime('%Y%m%d')
+    return _original_app_index(self, request, app_label, context)
+
+
+admin.site.app_index = MethodType(_app_index, admin.site)

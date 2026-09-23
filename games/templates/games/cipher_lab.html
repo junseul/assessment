@@ -78,6 +78,8 @@
 
   /* 보기 버튼 — 선택 가능한 카드처럼 */
   .cipher-option-btn {
+    max-width: 100%;
+    overflow: hidden;
     background: var(--color-canvas-white);
     border: 2px solid var(--color-mist-border);
     border-radius: 8px;
@@ -132,6 +134,7 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
   // tier 1-2 and two simultaneous attributes at tier 3. Real Raven's-style
   // XOR/결합/교차 items need a much larger generative model than fits here.
   const RULE_ATTRS = ['rotation', 'count', 'size'];
+  const TIER3_ATTR_PAIRS = [['rotation', 'count'], ['rotation', 'size']];
   const RULE_LABELS = { rotation: '회전', count: '수량변화', size: '크기변화' };
   const TIER_STEP = {
     1: { rotation: 90, count: 1, size: 20 },
@@ -169,7 +172,9 @@ if (!alreadyDone) document.getElementById('startBtn').addEventListener('click', 
 
   function generateItem(tier) {
     const shuffledAttrs = RULE_ATTRS.slice().sort(function () { return Math.random() - 0.5; });
-    const activeAttrs = tier === 3 ? shuffledAttrs.slice(0, 2) : shuffledAttrs.slice(0, 1);
+    const activeAttrs = tier === 3
+      ? TIER3_ATTR_PAIRS[Math.floor(Math.random() * TIER3_ATTR_PAIRS.length)]
+      : shuffledAttrs.slice(0, 1);
     const step = TIER_STEP[tier];
 
     function stateAtStep(k) {

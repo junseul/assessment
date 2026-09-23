@@ -6,12 +6,24 @@ def digits_only(value):
 
 
 class VerifyForm(forms.Form):
-    name = forms.CharField(label='이름', max_length=100)
-    birthdate = forms.DateField(label='생년월일', widget=forms.DateInput(attrs={'type': 'date'}))
+    name = forms.CharField(
+        label='이름',
+        max_length=100,
+        widget=forms.TextInput(attrs={'placeholder': '홍길동', 'autocomplete': 'name'}),
+    )
+    birthdate = forms.DateField(
+        label='생년월일',
+        widget=forms.DateInput(attrs={'type': 'date', 'autocomplete': 'bday'}),
+    )
     phone = forms.CharField(
         label='연락처',
         max_length=20,
-        widget=forms.TextInput(attrs={'type': 'tel'}),
+        widget=forms.TextInput(attrs={
+            'type': 'tel',
+            'placeholder': '010-1234-5678',
+            'autocomplete': 'tel',
+            'inputmode': 'tel',
+        }),
     )
 
     def clean_name(self):
